@@ -2,3 +2,5 @@ boto3
 beautifulsoup4
 urllib3
 requests
+markdown2
+cssutils
