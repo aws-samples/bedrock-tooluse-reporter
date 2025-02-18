@@ -172,6 +172,64 @@ def extract_conversation_text(conversation):
                             extracted_text += content_item['text'] + "\n\n"
     return extracted_text
 
+def get_complete_response(model, model_config, messages, report_prompt, max_attempts=10):
+    """完全なレスポンスを取得するまで繰り返し実行する関数"""
+    
+    complete_response = ""
+    continuation_markers = ["[続く...]","続く", "...", "…", "(続く)", "つづく","つづき","続き"]
+    last_markers = ["レポートの終了","レポートは終了","レポートを終了"]
+    attempt = 0
+    prompt_text = report_prompt
+ 
+    
+    while attempt < max_attempts:
+        # 現在の応答を取得
+
+        if attempt!=0:
+            messages = [
+            {
+                "role": "user",
+                "content": [
+                    {"text": '調査戦略に基づいて、次の章をお願いします。調査戦略に基づいた場合、次の章立てが無い場合は、「レポートの終了」と呟いてください。'}
+                ],
+            }
+            ]
+        else:
+            #initial
+            messages = messages 
+
+
+        response = model.generate_response(
+            model_config,
+            messages,
+            [{"text":prompt_text}],
+            {
+                'temperature': 1,
+                'maxTokens': 8192
+            }
+        )
+        
+        current_text = response['output']['message']['content'][0]['text']
+
+        print(f"\nprompt: {prompt_text}")
+        print(f"\nanswer: {current_text}")
+        complete_response += current_text
+        prompt_text += "\n"
+        prompt_text += current_text #コンテキストの保持
+        
+        has_last = any(marker in current_text[-20:] for marker in last_markers)
+        if has_last:
+            break
+        
+        # 続きを示す文字列が含まれているかチェック
+        #has_continuation = any(marker in current_text[-20:] for marker in continuation_markers)
+        
+        #if not has_continuation:
+        #    break
+            
+        attempt += 1
+        
+    return complete_response
 
 def main():
     parser = argparse.ArgumentParser(description='AI Research Assistant')
@@ -235,22 +293,34 @@ def main():
         {
             "role": "user",
             "content": [
-                {"text": f'{research_text}\n\nこれでレポートを書いてください。'}
+                {"text": f'{research_text}\n\nこれでレポートを書いてください。各章における説明は箇条書きではなくすべて文章とした上で、詳細なコンテキストを落とす事無く詳細なレポートとしてまとめてください。ここから繰り返し質問します。調査戦略にまとめた章ごとに詳細に長文を応答してください。章ごとに、続きは私から訪ねます。最終的にすべての章立ての情報を出力し終わった場合は、ひとこと「レポートの終了」と呟いてください。'}
             ],
         }
     ]
 
+#    report_prompt = create_report_generation_prompt(args.prompt, strategy_text)
+#    final_report = model.generate_response(
+#        MODEL_CONFIG[PRIMARY_MODEL],
+#        final_messages,
+#        [{"text": report_prompt}],
+#        {
+#            'temperature': 1,
+#            'maxTokens':8192
+#         },
+#    )
+
     report_prompt = create_report_generation_prompt(args.prompt, strategy_text)
-    final_report = model.generate_response(
+    final_report_text = get_complete_response(
+        model,
         MODEL_CONFIG[PRIMARY_MODEL],
         final_messages,
-        [{"text": report_prompt}],
-        {'temperature': 1},
+        report_prompt
+      #  [{"text": report_prompt}]
     )
 
     # 最終レポートの出力
     logger.section("最終レポート")
-    final_report_text = final_report['output']['message']['content'][0]['text']
+    #final_report_text = final_report['output']['message']['content'][0]['text']
     logger.log(final_report_text)
 
     # レポートの生成
