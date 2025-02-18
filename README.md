@@ -13,3 +13,5 @@
 2. `pip install -r requirements.txt` を実行
 3. python main.py --prompt "きのこの山とたけのこの里、どちらが至高のお菓子かの結論"  
   (prompt は自由に変える)
+4. `./reports/` ディレクトリに `report_YYYYMMDD_HH24MISS.md` および `html` 形式でレポートが出来上がります。
+5. enjoy!
