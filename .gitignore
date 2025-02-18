@@ -1,2 +1,4 @@
 .brave
 __pycache__/
+logs/*
+reports/*
