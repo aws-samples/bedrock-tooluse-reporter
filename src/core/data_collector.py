@@ -1,5 +1,14 @@
 """
-データ収集を担当するクラス
+Data Collector Module
+
+This module contains the DataCollector class which is responsible for gathering research data
+from various sources using available tools. It manages the interaction between AI models
+and external tools to collect relevant information based on the research strategy.
+
+The data collection process includes:
+1. Executing search queries
+2. Retrieving content from URLs
+3. Processing and organizing collected data
 """
 
 from typing import Dict, List, Optional

@@ -1,5 +1,14 @@
 """
-研究プロセス全体を管理するクラス
+Research Manager Module
+
+This module contains the ResearchManager class which orchestrates the entire research process.
+It manages the interaction between different components of the system, including data collection,
+AI model interaction, and report generation.
+
+The research process includes:
+1. Initial discussion to determine research strategy
+2. Data collection based on the strategy
+3. Report generation from collected data
 """
 
 from typing import Dict, List, Tuple

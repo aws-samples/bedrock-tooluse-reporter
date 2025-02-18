@@ -1,6 +1,18 @@
 """
-レポート生成を担当するクラス
+Report Builder Module
+
+This module contains the ReportBuilder class which is responsible for generating
+final research reports in both HTML and Markdown formats. It processes collected
+research data and creates well-structured, comprehensive reports with proper
+formatting and styling.
+
+Features:
+1. Markdown to HTML conversion
+2. Custom CSS styling
+3. Multiple output formats (HTML and Markdown)
+4. Structured report generation with proper sections
 """
+
 from datetime import datetime
 import os
 from typing import Dict, List, Tuple
@@ -10,7 +22,7 @@ import logging
 from ..utils.exceptions import ReportGenerationError
 from ..config.settings import MODEL_CONFIG, PRIMARY_MODEL, PROMPT_CONFIG
 
-# CSSパーサーのログを抑制
+# Suppress CSS parser logs
 cssutils.log.setLevel(logging.CRITICAL)
 
 
@@ -48,7 +60,7 @@ class ReportBuilder:
             self.logger.section("最終レポート生成")
             final_messages = self._create_final_messages(research_text)
             report_prompt = self._create_report_prompt(user_prompt, strategy_text)
-            
+
             final_report_text = self._get_complete_response(
                 final_messages,
                 report_prompt,
@@ -127,7 +139,7 @@ class ReportBuilder:
                 [{"text": prompt_text}],
                 {
                     'temperature': PROMPT_CONFIG['temperature']['default'],
-                    'maxTokens': PROMPT_CONFIG['max_tokens']
+                    'maxTokens': PROMPT_CONFIG['max_tokens'],
                 },
             )
 
