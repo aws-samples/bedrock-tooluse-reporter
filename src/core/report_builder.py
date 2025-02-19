@@ -145,7 +145,7 @@ class ReportBuilder:
 
             current_text = response['output']['message']['content'][0]['text']
             complete_response += current_text
-            prompt_text += "\n" + current_text
+            prompt_text += "\n\n" + current_text
 
             if any(marker in current_text[-20:] for marker in last_markers):
                 break
