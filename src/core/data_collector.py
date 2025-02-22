@@ -37,7 +37,7 @@ class DataCollector:
         conversation: Dict,
         strategy_text: str,
         user_prompt: str,
-    ) -> List[str]:
+        ) -> List[str]:
         """
         情報収集を実行
 
@@ -74,6 +74,9 @@ class DataCollector:
                 # AIの思考プロセスを出力
                 self._log_ai_thinking(response)
 
+                tool_use = self.tool_handler.process_tool_response(response)
+
+                # まずアシスタントメッセージを追加（ツール使用を含む）
                 conversation['F'].append(
                     {
                         'role': 'assistant',
@@ -81,13 +84,11 @@ class DataCollector:
                     }
                 )
 
-                tool_use = self.tool_handler.process_tool_response(response)
                 if not tool_use:
                     self.logger.log("情報収集完了（ツール使用なし）")
                     break
 
                 if tool_use['name'] == 'is_finished':
-                    self.logger.log("情報収集完了（明示的終了）")
                     conversation['F'].append(
                         {
                             'role': 'user',
@@ -101,12 +102,14 @@ class DataCollector:
                             ],
                         }
                     )
+                    self.logger.log("情報収集完了（明示的終了）")
                     break
 
                 # ツールの実行と結果の処理
                 result = self._execute_tool(tool_use)
                 if result:
                     collected_data.append(result)
+                    # ツール結果を追加
                     self._update_conversation(conversation, tool_use, result)
 
         except Exception as e:
