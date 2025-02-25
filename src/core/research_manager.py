@@ -6,13 +6,15 @@ It manages the interaction between different components of the system, including
 AI model interaction, and report generation.
 
 The research process includes:
-1. Initial discussion to determine research strategy
-2. Data collection based on the strategy
-3. Report generation from collected data
+1. Pre-research data collection
+2. Initial discussion to determine research strategy
+3. Detailed data collection based on the strategy
+4. Report generation from collected data
 """
 
 from typing import Dict, List, Tuple
 from ..models.bedrock import BedrockModel
+from ..models.source_reference import SourceReferenceManager
 from ..utils.tool_handler import ToolHandler
 from ..utils.exceptions import ResearchError
 from ..core.data_collector import DataCollector
@@ -39,6 +41,7 @@ class ResearchManager:
         self.data_collector = DataCollector(self.model, self.tool_handler, logger)
         self.report_builder = ReportBuilder(self.model, logger)
         self.conversation = {'A': [], 'I': [], 'F': []}
+        self.source_manager = SourceReferenceManager()
 
     def execute_research(self, user_prompt: str) -> Tuple[str, str]:
         """
@@ -56,18 +59,22 @@ class ResearchManager:
         try:
             self.logger.section(f"リサーチ開始: {user_prompt}")
 
+            # 事前調査
+            pre_research_data = self._conduct_pre_research(user_prompt)
+
             # 初期討議
-            strategy_text = self._conduct_initial_discussion(user_prompt)
+            strategy_text = self._conduct_initial_discussion(user_prompt, pre_research_data)
 
             # データ収集
-            collected_data = self.data_collector.collect_research_data(
+            collected_data, source_manager = self.data_collector.collect_research_data(
                 self.conversation,
                 strategy_text,
                 user_prompt,
             )
+            self.source_manager = source_manager
 
             # 収集データの整理
-            research_text = self._extract_conversation_text()
+            research_text = self._extract_conversation_text() 
             self._log_research_summary(research_text)
 
             # レポート生成
@@ -75,6 +82,7 @@ class ResearchManager:
                 research_text,
                 strategy_text,
                 user_prompt,
+                self.source_manager,
             )
 
             # レポート保存
@@ -86,12 +94,52 @@ class ResearchManager:
         except Exception as e:
             raise ResearchError(f"Error during research process: {str(e)}")
 
-    def _conduct_initial_discussion(self, user_prompt: str) -> str:
+    def _conduct_pre_research(self, user_prompt: str) -> str:
+        """
+        事前調査の実行
+
+        Args:
+            user_prompt: ユーザーの研究テーマ
+
+        Returns:
+            str: 事前調査で収集したデータ
+        """
+        self.logger.section("事前調査フェーズ")
+        self.logger.log("目的: コンテキスト情報の収集")
+
+        pre_research_prompt = self._create_pre_research_prompt(user_prompt)
+        self.conversation['F'] = []
+        self.conversation['F'].append(
+            {"role": "user", "content": [{"text": pre_research_prompt}]}
+        )
+
+        collected_data, source_manager = self.data_collector.collect_research_data(
+            self.conversation,
+            pre_research_prompt,
+            user_prompt,
+        )
+        self.source_manager = source_manager
+
+        result = "\n\n".join(collected_data)
+        self.logger.log("事前調査結果のサマリー:")
+        summary = (
+            result[:500] + "..."
+            if len(result) > 500
+            else result
+        )
+        self.logger.log(summary)
+
+        return result
+
+    def _conduct_initial_discussion(
+        self, user_prompt: str, pre_research_data: str
+    ) -> str:
         """
         初期討議の実行
 
         Args:
             user_prompt: ユーザーの研究テーマ
+            pre_research_data: 事前調査で収集したデータ
 
         Returns:
             str: 生成された調査戦略テキスト
@@ -99,8 +147,8 @@ class ResearchManager:
         self.logger.section("初期討議フェーズ")
         self.logger.log("目的: 調査方針の検討と決定")
 
-        self._initialize_conversation(user_prompt)
-        qualification_prompt = self._create_qualification_prompt(user_prompt)
+        self._initialize_conversation(user_prompt, pre_research_data)
+        qualification_prompt = self._create_qualification_prompt(user_prompt,pre_research_data)
         self._conduct_conversation(qualification_prompt)
 
         strategy_prompt = self._create_strategy_prompt(user_prompt)
@@ -117,14 +165,14 @@ class ResearchManager:
 
         return strategy_text
 
-    def _initialize_conversation(self, user_prompt: str):
+    def _initialize_conversation(self, user_prompt: str, pre_research_data: str):
         """会話の初期化"""
         self.conversation['A'] = [
             {
                 "role": "user",
                 "content": [
                     {
-                        "text": f'「{user_prompt}」って大変なお題をもらっちゃいましたね。どうしましょうか。'
+                        "text": f'「{user_prompt}」について、以下の事前調査結果をもとに検討しましょう：\n\n事前に収集した調査結果はこちらです：{pre_research_data}'
                     }
                 ],
             }
@@ -172,13 +220,29 @@ class ResearchManager:
             {"role": "user", "content": [{"text": response}]}
         )
 
-    def _create_qualification_prompt(self, user_prompt: str) -> List[Dict]:
+    def _create_pre_research_prompt(self, user_prompt: str) -> str:
+        """事前調査プロンプトの作成"""
+        return f'''あなたは優秀なリサーチャーです。
+「{user_prompt}」について、コンテキストがわからない用語も含めてキーワードに分割した上で、以下の点を明らかにするための情報を収集してください：
+
+1. 主要な概念や用語の定義
+2. 関連する用語や関連するコンテキスト
+3. 用語に関連する最新の動向や傾向や話題
+4. 用語に関連する最新の研究や、最新のニュース
+5. 用語に関連する事例
+
+Web検索とコンテンツ取得を使用して、これらの情報を収集してください。
+'''
+
+    def _create_qualification_prompt(self, user_prompt: str, pre_research_prompt: str) -> List[Dict]:
         """資格確認プロンプトの作成"""
         return [
             {
                 'text': f'''あなたは優秀なリサーチャーです。
 会話相手はあなたと同じ {user_prompt} という調査依頼を受けとった同僚の AI さんです。
-調査内容は雑なので、調査の粒度や観点などは仮説を持って調査をした後調査結果を作成し、調査結果のフィードバックをもらうことでしか改善できません。
+
+事前の調査内容として {pre_research_prompt} が与えられています。
+調査内容はキーワードや意味の列挙なので、調査の粒度や観点などは仮説を持って調査をした後調査結果を作成し、調査結果のフィードバックをもらうことでしか改善できません。
 AI さんはあなたの思考の枠を外して広い視野を提供してくれます。
 あなたも調査内容を自由に広げて網羅性を高め、その後どんなことを調べるのかを深めていってください。
 特に反対意見は大事です。お互いの網羅性や深さの不足を指摘しながらAI さんとの会話を重ね、リサーチする内容を決めていってください。
