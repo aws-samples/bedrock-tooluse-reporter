@@ -41,7 +41,7 @@ class DataCollector:
         conversation: Dict,
         strategy_text: str,
         user_prompt: str,
-        ) -> Tuple[List[str], SourceReferenceManager]:
+    ) -> Tuple[List[str], SourceReferenceManager]:
         """
         情報収集を実行
 
@@ -80,7 +80,6 @@ class DataCollector:
 
                 tool_use = self.tool_handler.process_tool_response(response)
 
- 
                 if not tool_use:
                     self.logger.log("情報収集完了（ツール使用なし）")
                     break
@@ -168,7 +167,7 @@ class DataCollector:
             result = self.tool_handler.search(**tool_use['input'])
             self.logger.log("\n検索結果:")
         elif tool_use['name'] == 'get_content':
-            result,title = self.tool_handler.get_content(**tool_use['input'])
+            result, title = self.tool_handler.get_content(**tool_use['input'])
             if result:
                 # Add source reference and get citation mark
                 url = tool_use['input'].get('url', '')
@@ -176,7 +175,7 @@ class DataCollector:
                     SourceReference(
                         url=url,
                         title=title,
-                        accessed_at=datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                        accessed_at=datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
                     )
                 )
             self.logger.log("\nコンテンツ取得結果:")
@@ -192,6 +191,7 @@ class DataCollector:
     def _extract_title(self, content: str) -> Optional[str]:
         """Extract title from HTML content"""
         import re
+
         title_match = re.search(r'<title>(.*?)</title>', content, re.IGNORECASE)
         if title_match:
             return title_match.group(1)

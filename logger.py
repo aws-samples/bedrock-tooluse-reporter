@@ -9,11 +9,11 @@ from typing import Optional
 class DualLogger:
     """
     コンソールとファイルの両方に出力するロガークラス
-    
+
     このクラスは、研究プロセス中のメッセージをコンソールとログファイルの
     両方に出力するためのインターフェースを提供します。
     """
-    
+
     def __init__(self, output_dir: str = 'logs'):
         """
         コンソールとファイルの両方に出力するロガーの初期化
@@ -31,7 +31,7 @@ class DualLogger:
         # ロガーの設定
         self.logger = logging.getLogger('research_logger')
         self.logger.setLevel(logging.INFO)
-        
+
         # 既存のハンドラをクリア（複数回の初期化を防止）
         if self.logger.handlers:
             self.logger.handlers.clear()
@@ -68,7 +68,7 @@ class DualLogger:
     def section(self, title: str):
         """
         セクションタイトルを出力
-        
+
         大きなセクションの開始を示すタイトルを出力します。
 
         Args:
@@ -79,7 +79,7 @@ class DualLogger:
     def subsection(self, title: str):
         """
         サブセクションタイトルを出力
-        
+
         セクション内のサブセクションの開始を示すタイトルを出力します。
 
         Args:
@@ -90,35 +90,35 @@ class DualLogger:
     def get_log_file_path(self) -> str:
         """
         ログファイルのパスを取得
-        
+
         Returns:
             str: 現在のログファイルの絶対パス
         """
         return self.log_file
-        
+
     def truncate_text(self, text: str, max_length: int = 500) -> str:
         """
         テキストを指定された長さに切り詰める
-        
+
         長いテキストをログに出力する前に適切な長さに切り詰めます。
-        
+
         Args:
             text: 切り詰めるテキスト
             max_length: 最大長（デフォルト: 500文字）
-            
+
         Returns:
             str: 切り詰められたテキスト（必要な場合は「...」が追加される）
         """
         if len(text) <= max_length:
             return text
         return text[:max_length] + "..."
-        
+
     def log_summary(self, text: str, max_length: int = 500):
         """
         テキストの要約をログに出力
-        
+
         長いテキストの要約（先頭部分）をログに出力します。
-        
+
         Args:
             text: 要約するテキスト
             max_length: 最大長（デフォルト: 500文字）

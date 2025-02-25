@@ -4,7 +4,7 @@
 * リージョンは `us-west-2`
 * aws configure してあること
 * Bedrock Invoke できること
-* 3.5-sonnet-v2, llama-3.3-70b が使えること
+* claude-3.7-sonnet-v1, claude-3.5-sonnet-v2 が使えること
 
 ## Getting started
 

@@ -63,7 +63,9 @@ class ResearchManager:
             pre_research_data = self._conduct_pre_research(user_prompt)
 
             # 初期討議
-            strategy_text = self._conduct_initial_discussion(user_prompt, pre_research_data)
+            strategy_text = self._conduct_initial_discussion(
+                user_prompt, pre_research_data
+            )
 
             # データ収集
             collected_data, source_manager = self.data_collector.collect_research_data(
@@ -74,7 +76,7 @@ class ResearchManager:
             self.source_manager = source_manager
 
             # 収集データの整理
-            research_text = self._extract_conversation_text() 
+            research_text = self._extract_conversation_text()
             self._log_research_summary(research_text)
 
             # レポート生成
@@ -122,11 +124,7 @@ class ResearchManager:
 
         result = "\n\n".join(collected_data)
         self.logger.log("事前調査結果のサマリー:")
-        summary = (
-            result[:500] + "..."
-            if len(result) > 500
-            else result
-        )
+        summary = result[:500] + "..." if len(result) > 500 else result
         self.logger.log(summary)
 
         return result
@@ -148,7 +146,9 @@ class ResearchManager:
         self.logger.log("目的: 調査方針の検討と決定")
 
         self._initialize_conversation(user_prompt, pre_research_data)
-        qualification_prompt = self._create_qualification_prompt(user_prompt,pre_research_data)
+        qualification_prompt = self._create_qualification_prompt(
+            user_prompt, pre_research_data
+        )
         self._conduct_conversation(qualification_prompt)
 
         strategy_prompt = self._create_strategy_prompt(user_prompt)
@@ -234,7 +234,9 @@ class ResearchManager:
 Web検索とコンテンツ取得を使用して、これらの情報を収集してください。
 '''
 
-    def _create_qualification_prompt(self, user_prompt: str, pre_research_prompt: str) -> List[Dict]:
+    def _create_qualification_prompt(
+        self, user_prompt: str, pre_research_prompt: str
+    ) -> List[Dict]:
         """資格確認プロンプトの作成"""
         return [
             {

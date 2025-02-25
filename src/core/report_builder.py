@@ -124,11 +124,18 @@ class ReportBuilder:
         messages: List[Dict],
         report_prompt: str,
         source_manager: SourceReferenceManager,
-        max_attempts: int = 10
+        max_attempts: int = 10,
     ) -> str:
         """完全なレスポンスを取得"""
         complete_response = ""
-        last_markers = ["レポートの終了", "レポートは終了", "レポートを終了","レポートは完了","レポートの完了","レポートを完了"]
+        last_markers = [
+            "レポートの終了",
+            "レポートは終了",
+            "レポートを終了",
+            "レポートは完了",
+            "レポートの完了",
+            "レポートを完了",
+        ]
         attempt = 0
         prompt_text = report_prompt
         chapter_references = set()
@@ -160,9 +167,7 @@ class ReportBuilder:
 
             self.logger.log("レポートの一部引用:")
             summary = (
-                current_text[:500] + "..."
-                if len(current_text) > 500
-                else current_text
+                current_text[:500] + "..." if len(current_text) > 500 else current_text
             )
             self.logger.log(summary)
 
@@ -175,29 +180,33 @@ class ReportBuilder:
                 break
 
             attempt += 1
-        
+
         # Process the text to ensure proper citation format and collect references
         for ref in source_manager.get_all_references():
-           citation_mark = f"[※{ref.reference_number}]"
-           self.logger.log(f"{citation_mark} : {ref.url} / {ref.title}")
-           chapter_references.add(ref)
+            citation_mark = f"[※{ref.reference_number}]"
+            self.logger.log(f"{citation_mark} : {ref.url} / {ref.title}")
+            chapter_references.add(ref)
 
-#           if citation_mark in complete_response or ref.url in complete_response:
-#               chapter_references.add(ref)
-#               # Replace plain URLs with hyperlinked citations
-#               current_text = complete_response.replace(ref.url, f"[{citation_mark}]({ref.url})")
-#               # Ensure citation marks are properly formatted
-#               current_text = complete_response.replace(
-#                   f"[{ref.reference_number}]",
-#                   citation_mark
-#               )
-#
-       # Add chapter references if any were used
+        #           if citation_mark in complete_response or ref.url in complete_response:
+        #               chapter_references.add(ref)
+        #               # Replace plain URLs with hyperlinked citations
+        #               current_text = complete_response.replace(ref.url, f"[{citation_mark}]({ref.url})")
+        #               # Ensure citation marks are properly formatted
+        #               current_text = complete_response.replace(
+        #                   f"[{ref.reference_number}]",
+        #                   citation_mark
+        #               )
+        #
+        # Add chapter references if any were used
         if chapter_references:
-           complete_response += "\n\n### 参考文献\n"
-           for ref in sorted(chapter_references, key=lambda x: x.reference_number or 0):
-               complete_response += f"※{ref.reference_number}. [{ref.title}]({ref.url})\n\n"
-        
+            complete_response += "\n\n### 参考文献\n"
+            for ref in sorted(
+                chapter_references, key=lambda x: x.reference_number or 0
+            ):
+                complete_response += (
+                    f"※{ref.reference_number}. [{ref.title}]({ref.url})\n\n"
+                )
+
         return complete_response
 
     def _create_final_messages(
@@ -237,7 +246,7 @@ class ReportBuilder:
 9: 章をまたいで、Report全体の文脈の流れを維持する。
 10: 最終的にすべての章立ての情報を出力し終わった場合は、ひとこと「レポートの終了」と呟く。
 '''
-#11: インターネットの検索からの情報を引用している場合にのみ、該当するURLとハイパーリンクを作ってください。架空の参考文献を作り出さないでください。
+                        # 11: インターネットの検索からの情報を引用している場合にのみ、該当するURLとハイパーリンクを作ってください。架空の参考文献を作り出さないでください。
                     }
                 ],
             }
@@ -334,8 +343,7 @@ class ReportBuilder:
         """HTMLファイルの保存"""
         # Use markdown2 with extras, but without link-patterns
         html_content = markdown2.markdown(
-            markdown_text,
-            extras=['tables', 'fenced-code-blocks']
+            markdown_text, extras=['tables', 'fenced-code-blocks']
         )
         current_time = datetime.now().strftime('%Y年%m月%d日 %H:%M')
 
