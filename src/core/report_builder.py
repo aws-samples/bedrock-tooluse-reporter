@@ -11,6 +11,7 @@ Features:
 2. Custom CSS styling
 3. Multiple output formats (HTML and Markdown)
 4. Structured report generation with proper sections
+5. Source references at the end of each chapter
 """
 
 from datetime import datetime
@@ -20,6 +21,7 @@ import markdown2
 import cssutils
 import logging
 from ..utils.exceptions import ReportGenerationError
+from ..models.source_reference import SourceReferenceManager
 from ..config.settings import MODEL_CONFIG, PRIMARY_MODEL, PROMPT_CONFIG
 
 # Suppress CSS parser logs
@@ -40,7 +42,11 @@ class ReportBuilder:
         self.css = self._get_default_css()
 
     def generate_final_report(
-        self, research_text: str, strategy_text: str, user_prompt: str
+        self,
+        research_text: str,
+        strategy_text: str,
+        user_prompt: str,
+        source_manager: SourceReferenceManager,
     ) -> str:
         """
         最終レポートを生成
@@ -49,6 +55,7 @@ class ReportBuilder:
             research_text: 収集した研究データ
             strategy_text: 調査戦略テキスト
             user_prompt: ユーザーのプロンプト
+            source_manager: ソース参照マネージャー
 
         Returns:
             str: 生成されたレポートテキスト
@@ -58,12 +65,13 @@ class ReportBuilder:
         """
         try:
             self.logger.section("最終レポート生成")
-            final_messages = self._create_final_messages(research_text)
+            final_messages = self._create_final_messages(research_text, source_manager)
             report_prompt = self._create_report_prompt(user_prompt, strategy_text)
 
             final_report_text = self._get_complete_response(
                 final_messages,
                 report_prompt,
+                source_manager,
             )
 
             self.logger.section("最終レポート")
@@ -112,13 +120,18 @@ class ReportBuilder:
             raise ReportGenerationError(f"Error saving report: {str(e)}")
 
     def _get_complete_response(
-        self, messages: List[Dict], report_prompt: str, max_attempts: int = 10
+        self,
+        messages: List[Dict],
+        report_prompt: str,
+        source_manager: SourceReferenceManager,
+        max_attempts: int = 10
     ) -> str:
         """完全なレスポンスを取得"""
         complete_response = ""
-        last_markers = ["レポートの終了", "レポートは終了", "レポートを終了"]
+        last_markers = ["レポートの終了", "レポートは終了", "レポートを終了","レポートは完了","レポートの完了","レポートを完了"]
         attempt = 0
         prompt_text = report_prompt
+        chapter_references = set()
 
         while attempt < max_attempts:
             if attempt != 0:
@@ -127,7 +140,7 @@ class ReportBuilder:
                         "role": "user",
                         "content": [
                             {
-                                "text": '調査戦略に基づいて、次の章をお願いします。調査戦略に基づいた場合、次の章立てが無い場合は、「レポートの終了」と呟いてください。'
+                                "text": "調査戦略に基づいて、今の章内の続きを執筆するか、次の章を執筆してください。全ての調査フレームを終え、続きがない場合は、「レポートの終了」と呟いてください。「次の章へ進むか？」は聞かないでください。"
                             }
                         ],
                     }
@@ -144,64 +157,87 @@ class ReportBuilder:
             )
 
             current_text = response['output']['message']['content'][0]['text']
-            complete_response += current_text
+
+            self.logger.log("レポートの一部引用:")
+            summary = (
+                current_text[:500] + "..."
+                if len(current_text) > 500
+                else current_text
+            )
+            self.logger.log(summary)
+
+            chapter_references.clear()
+
+            complete_response += current_text + "\n\n"
             prompt_text += "\n\n" + current_text
 
-            if any(marker in current_text[-20:] for marker in last_markers):
+            if any(marker in current_text[-50:] for marker in last_markers):
                 break
 
             attempt += 1
+        
+        # Process the text to ensure proper citation format and collect references
+        for ref in source_manager.get_all_references():
+           citation_mark = f"[※{ref.reference_number}]"
+           self.logger.log(f"{citation_mark} : {ref.url} / {ref.title}")
+           chapter_references.add(ref)
 
+#           if citation_mark in complete_response or ref.url in complete_response:
+#               chapter_references.add(ref)
+#               # Replace plain URLs with hyperlinked citations
+#               current_text = complete_response.replace(ref.url, f"[{citation_mark}]({ref.url})")
+#               # Ensure citation marks are properly formatted
+#               current_text = complete_response.replace(
+#                   f"[{ref.reference_number}]",
+#                   citation_mark
+#               )
+#
+       # Add chapter references if any were used
+        if chapter_references:
+           complete_response += "\n\n### 参考文献\n"
+           for ref in sorted(chapter_references, key=lambda x: x.reference_number or 0):
+               complete_response += f"※{ref.reference_number}. [{ref.title}]({ref.url})\n\n"
+        
         return complete_response
 
-    def _create_final_messages(self, research_text: str) -> List[Dict]:
+    def _create_final_messages(
+        self, research_text: str, source_manager: SourceReferenceManager
+    ) -> List[Dict]:
         """最終メッセージの作成"""
+        # Create reference information for the prompt
+        reference_info = "\n\n利用可能な情報源:\n"
+        for ref in source_manager.get_all_references():
+            reference_info += f"- [{ref.title}]({ref.url}) [※{ref.reference_number}]\n"
+
         return [
             {
                 "role": "user",
                 "content": [
                     {
                         "text": f'''
-{research_text}\n\nこれでレポートを書いてください。
+{research_text}
+
+{reference_info}
+
+これでレポートを書いてください。
 
 ここから繰り返し質問します。
 以下の*Rule*に従って出力を続けてください。
 
 #Rule
 0: Respond directly without asking questions or seeking clarification. 
-1: Do not include statements about waiting for responses or confirmations.
+1: Do not include statements about waiting for responses or confirmations or questions.
 2: Do not include statements about next chapter
 3: 章ごとに出力する。続きが繰り返し問い合わせされる。
-4: 調査戦略にまとめた"章ごと"に詳細なコンテキストを落とす事無く、箇条書きではなく長文を出力する
-5: 章ごとに、詳細な続きを出力。
-6: 専門的な説明や具体的な内容、データや数値など詳細なコンテキストは全て維持する
-7: 文体はレポート文体で長文のみ。
-8: 出力する文章から*ForDelete*に沿って特徴を持つ文を削除,削除した場合改行で代替する
-9: Report全体の文脈の流れを維持する。次の章について予告は不要
-10: 最終的にすべての章立ての情報を出力し終わった場合は、ひとこと「レポートの終了」と呟いてください。
-
-#ForDelete
-0. 問いかけを待っている事を伝える文
-例：「これに続く文を順次出力しますので、お声がけください」
-1. 報告や説明の許可を求める文
-例：「～してよろしいでしょうか？」
-    「～させていただきますが、よろしいでしょうか？」
-2. 報告開始を宣言する文
-例：「～について報告いたします」
-    「～から始めさせていただきます」
-3. 一般的なシステム応答的な文
-例：「承知しました」
-    「はい」で始まる確認応答
-4. 続きがあることを予告・内容を示唆する文
-例：「以下にレポートを続けます：」
-5. 続けることを確認する質問文
-例：「次の章に進みましょうか？」
-6. 続けることを確認する質問文
-
-7. 予告文
-例：「次の分析は「foobar」になります。」
-    「調査フレームワークに基づき、次の章は「foobar」となります。」
+4: 調査戦略にまとめた"章ごと"に詳細なコンテキストを全て維持する
+5: 箇条書きではなく長文、または、表を出力する
+6: レポート分は客観的なデータポイントについて詳細に解説し、それを論拠として、考察と推論について述べる順番でロジックを展開する
+7: 専門的な説明や具体的な内容、データや数値など詳細なコンテキストは全て維持する
+8: 文体はレポート文体で長文とする。
+9: 章をまたいで、Report全体の文脈の流れを維持する。
+10: 最終的にすべての章立ての情報を出力し終わった場合は、ひとこと「レポートの終了」と呟く。
 '''
+#11: インターネットの検索からの情報を引用している場合にのみ、該当するURLとハイパーリンクを作ってください。架空の参考文献を作り出さないでください。
                     }
                 ],
             }
@@ -218,7 +254,8 @@ class ReportBuilder:
 
 * ナレーティブに文章を書く。安易に箇条書きを用いない
 * 客観的なデータ、特に数字を用いた分析に基づいた論述を用いる
-* 複数の視点からの考察。ただし視点の主体は明らかにする
+* レポート分は客観的なデータポイントについて詳細に解説し、それを論拠として、考察と推論について述べる順番でロジックを展開する
+* 複数の視点からの考察を行う。ただし視点の主体は明らかにする
 * 明確な構造と論理的な展開を心がけてください。突飛な話は読者が戸惑います
 * 具体例や事例の適切な活用をしてください。具体例は説得力が増します
 * 結論の妥当性と説得力を意識して書いてください
@@ -248,6 +285,12 @@ class ReportBuilder:
             padding-left: 10px;
             margin-top: 25px;
         }
+        h3 {
+            color: #34495e;
+            border-bottom: 1px solid #3498db;
+            padding-bottom: 5px;
+            margin-top: 20px;
+        }
         p {
             margin: 15px 0;
             text-align: justify;
@@ -262,6 +305,15 @@ class ReportBuilder:
             padding: 20px;
             border-radius: 5px;
             box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        a {
+            color: #3498db;
+            text-decoration: none;
+            transition: color 0.3s ease;
+        }
+        a:hover {
+            color: #2980b9;
+            text-decoration: underline;
         }
         """
 
@@ -280,7 +332,11 @@ class ReportBuilder:
 
     def _save_html(self, markdown_text: str, output_path: str, title: str) -> str:
         """HTMLファイルの保存"""
-        html_content = markdown2.markdown(markdown_text)
+        # Use markdown2 with extras, but without link-patterns
+        html_content = markdown2.markdown(
+            markdown_text,
+            extras=['tables', 'fenced-code-blocks']
+        )
         current_time = datetime.now().strftime('%Y年%m月%d日 %H:%M')
 
         html_document = f"""
