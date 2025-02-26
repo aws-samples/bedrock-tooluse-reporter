@@ -36,8 +36,8 @@ class ResearchManager:
             logger: ロガーインスタンス
         """
         self.logger = logger
-        self.model = BedrockModel()
-        self.tool_handler = ToolHandler()
+        self.model = BedrockModel(logger)
+        self.tool_handler = ToolHandler(logger)
         self.data_collector = DataCollector(self.model, self.tool_handler, logger)
         self.report_builder = ReportBuilder(self.model, logger)
         self.conversation = {'A': [], 'I': [], 'F': []}
