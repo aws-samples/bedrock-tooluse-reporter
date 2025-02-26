@@ -7,8 +7,9 @@ from botocore.config import Config
 import time
 from typing import Dict, List, Any, Optional
 from botocore.exceptions import ClientError
-from src.utils.exceptions import ModelError
-from src.config.settings import LLM_CONNECTION
+from ..utils.exceptions import ModelError
+from ..config.settings import LLM_CONNECTION
+import logging
 
 
 class BedrockModel:
@@ -19,7 +20,7 @@ class BedrockModel:
     エラー処理と再試行ロジックを提供します。
     """
 
-    def __init__(self):
+    def __init__(self,logger):
         """
         Bedrock クライアントの初期化
 
@@ -35,6 +36,7 @@ class BedrockModel:
         self.max_retries = LLM_CONNECTION['max_retries']
         self.base_delay = LLM_CONNECTION['base_delay']
         self.max_delay = LLM_CONNECTION['max_delay']
+        self.logger = logger
 
     def _exponential_backoff(self, retry_count: int) -> float:
         """
@@ -119,3 +121,88 @@ class BedrockModel:
             except Exception as e:
                 # 予期しないエラー
                 raise ModelError(f"Unexpected error during API call: {str(e)}")
+
+    def process_pdf(self, pdf_content: bytes, model_id: str) -> str:
+        """
+        PDFファイルを処理してテキストを抽出
+
+        PDFファイルをBedrockにアップロードし、AIモデルを使用してテキストを抽出します。
+
+        Args:
+            pdf_content: PDFファイルのバイナリコンテンツ
+            model_id: 使用するモデルのID
+
+        Returns:
+            str: 抽出されたテキスト
+
+        Raises:
+            ModelError: PDFの処理中にエラーが発生した場合
+        """
+        try:
+            # PDFファイルをアップロードしてテキストを抽出するためのプロンプト
+            prompt = "あなたは優秀なリサーチャーです。PDFの内容から、コンテキストを全て維持した状態で、中の図や文字列を解釈して内容を長文で説明するようにお願いします。"
+            
+            # APIリクエストのパラメータを構築
+            kwargs = {
+                'modelId': model_id,
+                'messages': [
+                    {
+                        'role': 'user',
+                        'content': [
+                            {
+                                "document":{
+                                    "name": "PDF Document",
+                                    "format": "pdf",
+                                    "source": {"bytes": pdf_content}
+                                }
+                            },       
+                            {'text': prompt}
+                        ]
+                    }
+                ]
+            }
+            
+            # リトライロジックの実装
+            retry_count = 0
+            while retry_count <= self.max_retries:
+                try:
+                    # PDFファイルをアップロードしてテキストを抽出
+                    response = self.client.converse(**kwargs)
+                    self.logger.log(f"PDF / response: {response}")
+                    # レスポンスからテキストを抽出
+                    if 'output' in response and 'message' in response['output'] and 'content' in response['output']['message']:
+                        for content in response['output']['message']['content']:
+                            if 'text' in content:
+                                return content['text']
+                    
+                    # テキストが見つからない場合は空文字列を返す
+                    return ""
+                    
+                except ClientError as e:
+                    error_code = e.response['Error']['Code']
+                    self.logger.log(f"PDF / Bedrock error_code: {error_code}")
+
+                    # 一時的なエラーの場合はリトライ
+                    if error_code in [
+                        'ThrottlingException',
+                        'ServiceUnavailable',
+                        'InternalServerError',
+                    ]:
+                        if retry_count == self.max_retries:
+                            raise ModelError(
+                                f"Maximum retries ({self.max_retries}) exceeded. "
+                                f"Last error: {str(e)}"
+                            )
+
+                        wait_time = self._exponential_backoff(retry_count)
+                        time.sleep(wait_time)
+                        retry_count += 1
+                    else:
+                        # その他のエラータイプは即座に例外を発生
+                        raise ModelError(f"Bedrock API error during PDF processing: {str(e)}")
+                except Exception as e:
+                    # 予期しないエラー
+                    raise ModelError(f"Unexpected error during PDF processing: {str(e)}")
+                    
+        except Exception as e:
+            raise ModelError(f"Error processing PDF: {str(e)}")
