@@ -24,6 +24,9 @@ from ..config.settings import (
     PRIMARY_MODEL,
     SECONDARY_MODEL,
     MAX_CONVERSATION_TURNS,
+    SUMMARY_CONVERSATION_TURNS,
+    MAX_PRE_RESEARCH_SEARCHES,
+    SUMMARY_PRE_RESEARCH_SEARCHES,
 )
 
 
@@ -42,13 +45,15 @@ class ResearchManager:
         self.report_builder = ReportBuilder(self.model, logger)
         self.conversation = {'A': [], 'I': [], 'F': []}
         self.source_manager = SourceReferenceManager()
+        self.mode = "standard"  # デフォルトは標準モード
 
-    def execute_research(self, user_prompt: str) -> Tuple[str, str]:
+    def execute_research(self, user_prompt: str, mode: str = "standard") -> Tuple[str, str]:
         """
         研究プロセスの実行
 
         Args:
             user_prompt: ユーザーの研究テーマ
+            mode: 研究モード ("standard" または "summary")
 
         Returns:
             Tuple[str, str]: 生成されたHTMLとMarkdownレポートのパス
@@ -57,7 +62,11 @@ class ResearchManager:
             ResearchError: 研究プロセス中のエラー
         """
         try:
-            self.logger.section(f"リサーチ開始: {user_prompt}")
+            self.mode = mode.lower()
+            if self.mode not in ["standard", "summary"]:
+                self.mode = "standard"  # 不明なモードの場合はデフォルトに設定
+                
+            self.logger.section(f"リサーチ開始: {user_prompt} (モード: {self.mode})")
 
             # 事前調査
             pre_research_data = self._conduct_pre_research(user_prompt)
@@ -72,6 +81,7 @@ class ResearchManager:
                 self.conversation,
                 strategy_text,
                 user_prompt,
+                self.mode,
             )
             self.source_manager = source_manager
 
@@ -85,6 +95,7 @@ class ResearchManager:
                 strategy_text,
                 user_prompt,
                 self.source_manager,
+                self.mode,
             )
 
             # レポート保存
@@ -115,10 +126,15 @@ class ResearchManager:
             {"role": "user", "content": [{"text": pre_research_prompt}]}
         )
 
+        # モードに応じた最大検索回数を設定
+        max_searches = SUMMARY_PRE_RESEARCH_SEARCHES if self.mode == "summary" else MAX_PRE_RESEARCH_SEARCHES
+        
         collected_data, source_manager = self.data_collector.collect_research_data(
             self.conversation,
             pre_research_prompt,
             user_prompt,
+            self.mode,
+            max_searches,
         )
         self.source_manager = source_manager
 
@@ -149,7 +165,10 @@ class ResearchManager:
         qualification_prompt = self._create_qualification_prompt(
             user_prompt, pre_research_data
         )
-        self._conduct_conversation(qualification_prompt)
+        
+        # モードに応じた最大会話ターン数を設定
+        max_turns = SUMMARY_CONVERSATION_TURNS if self.mode == "summary" else MAX_CONVERSATION_TURNS
+        self._conduct_conversation(qualification_prompt, max_turns)
 
         strategy_prompt = self._create_strategy_prompt(user_prompt)
         strategy_response = self.model.generate_response(
@@ -179,9 +198,9 @@ class ResearchManager:
         ]
         self.conversation['I'] = []
 
-    def _conduct_conversation(self, system_prompt: List[Dict]):
+    def _conduct_conversation(self, system_prompt: List[Dict], max_turns: int):
         """AIモデル間の会話を実行"""
-        for turn in range(MAX_CONVERSATION_TURNS):
+        for turn in range(max_turns):
             self.logger.subsection(f"討議ターン {turn + 1}")
 
             # Primary AIの応答
@@ -238,6 +257,9 @@ Web検索とコンテンツ取得を使用して、これらの情報を収集�
         self, user_prompt: str, pre_research_prompt: str
     ) -> List[Dict]:
         """資格確認プロンプトの作成"""
+        # モードに応じた最大会話ターン数を設定
+        max_turns = SUMMARY_CONVERSATION_TURNS if self.mode == "summary" else MAX_CONVERSATION_TURNS
+        
         return [
             {
                 'text': f'''あなたは優秀なリサーチャーです。
@@ -248,7 +270,7 @@ Web検索とコンテンツ取得を使用して、これらの情報を収集�
 AI さんはあなたの思考の枠を外して広い視野を提供してくれます。
 あなたも調査内容を自由に広げて網羅性を高め、その後どんなことを調べるのかを深めていってください。
 特に反対意見は大事です。お互いの網羅性や深さの不足を指摘しながらAI さんとの会話を重ね、リサーチする内容を決めていってください。
-会話はお互い {MAX_CONVERSATION_TURNS} 回までしかできないので、それまでに議論をまとめてください。
+会話はお互い {max_turns} 回までしかできないので、それまでに議論をまとめてください。
 ただし会話は以下の内容をまとめてください。
 
 * 具体的にどんなことをするのか actionable にまとめる必要があります。

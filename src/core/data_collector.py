@@ -18,7 +18,7 @@ from ..models.bedrock import BedrockModel
 from ..models.source_reference import SourceReference, SourceReferenceManager
 from ..utils.tool_handler import ToolHandler
 from ..utils.exceptions import DataCollectionError
-from ..config.settings import MODEL_CONFIG, PRIMARY_MODEL, TOOL_CONFIG
+from ..config.settings import MODEL_CONFIG, PRIMARY_MODEL, TOOL_CONFIG, MAX_RESEARCH_SEARCHES, SUMMARY_RESEARCH_SEARCHES
 
 
 class DataCollector:
@@ -41,6 +41,8 @@ class DataCollector:
         conversation: Dict,
         strategy_text: str,
         user_prompt: str,
+        mode: str = "standard",
+        max_iterations: Optional[int] = None,
     ) -> Tuple[List[str], SourceReferenceManager]:
         """
         情報収集を実行
@@ -49,6 +51,8 @@ class DataCollector:
             conversation: 会話履歴
             strategy_text: 調査戦略テキスト
             user_prompt: ユーザーのプロンプト
+            mode: 研究モード ("standard" または "summary")
+            max_iterations: 最大反復回数（指定がない場合はモードに基づいて決定）
 
         Returns:
             Tuple[List[str], SourceReferenceManager]: 収集したデータのリストとソース参照マネージャー
@@ -62,10 +66,16 @@ class DataCollector:
         conversation['F'] = []
         conversation['F'].append({"role": "user", "content": [{"text": strategy_text}]})
 
+        # モードに基づいて最大反復回数を決定
+        if max_iterations is None:
+            max_iterations = SUMMARY_RESEARCH_SEARCHES if mode == "summary" else MAX_RESEARCH_SEARCHES
+        
+        self.logger.log(f"情報収集モード: {mode}, 最大反復回数: {max_iterations}")
+
         collected_data = []
         try:
-            for i in range(100):  # 最大100回の情報収集試行
-                self.logger.subsection(f"情報収集ステップ {i+1}")
+            for i in range(max_iterations):  # モードに基づいた最大反復回数
+                self.logger.subsection(f"情報収集ステップ {i+1}/{max_iterations}")
 
                 response = self.model.generate_response(
                     MODEL_CONFIG[PRIMARY_MODEL],

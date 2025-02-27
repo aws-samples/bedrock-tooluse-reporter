@@ -23,6 +23,14 @@ SECONDARY_MODEL = 'claude-3.5-sonnet'  # 二次的な対話に使用するモデ
 
 # 会話の最大ターン数
 MAX_CONVERSATION_TURNS = 5
+SUMMARY_CONVERSATION_TURNS = 3  # サマリーモードでの会話の最大ターン数
+
+# 調査の最大回数
+MAX_PRE_RESEARCH_SEARCHES = 40  # 標準モードでの事前調査の最大検索回数
+SUMMARY_PRE_RESEARCH_SEARCHES = 3  # サマリーモードでの事前調査の最大検索回数
+
+MAX_RESEARCH_SEARCHES = 40  # 標準モードでの調査の最大検索回数
+SUMMARY_RESEARCH_SEARCHES = 7  # サマリーモードでの調査の最大検索回数
 
 # LLM接続設定
 LLM_CONNECTION = {
@@ -120,4 +128,8 @@ REPORT_CONFIG = {
         "レポートの完了",
         "レポートを完了",
     ],
+    'output_mode': {
+        'standard': 'chapter',  # 標準モードでは章ごとに出力
+        'summary': 'full',  # サマリーモードではレポート全体を一度に出力
+    },
 }

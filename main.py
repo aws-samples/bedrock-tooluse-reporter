@@ -20,7 +20,7 @@ def main():
     Main execution function for the research assistant.
 
     This function:
-    1. Parses command-line arguments to get the research prompt
+    1. Parses command-line arguments to get the research prompt and mode
     2. Initializes the logging system
     3. Creates and executes a research manager instance
     4. Handles any errors that occur during the research process
@@ -30,6 +30,8 @@ def main():
     """
     parser = argparse.ArgumentParser(description='AI Research Assistant')
     parser.add_argument('--prompt', required=True, help='Research prompt/question')
+    parser.add_argument('--mode', choices=['standard', 'summary'], default='standard',
+                      help='Research mode: standard (default) or summary')
     args = parser.parse_args()
 
     # Initialize logger
@@ -38,9 +40,9 @@ def main():
     try:
         # Initialize and execute research manager
         research_manager = ResearchManager(logger)
-        html_path, md_path = research_manager.execute_research(args.prompt)
+        html_path, md_path = research_manager.execute_research(args.prompt, args.mode)
 
-        logger.log(f"研究が完了しました。")
+        logger.log(f"研究が完了しました。(モード: {args.mode})")
         logger.log(f"HTMLレポート: {html_path}")
         logger.log(f"Markdownレポート: {md_path}")
 
