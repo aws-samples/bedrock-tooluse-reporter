@@ -9,27 +9,31 @@ formatting and styling.
 Features:
 1. Markdown to HTML conversion
 2. Custom CSS styling
-3. Multiple output formats (HTML and Markdown)
+3. Multiple output formats (HTML, Markdown, and PDF)
 4. Structured report generation with proper sections
 5. Source references at the end of each chapter
+6. Image directory creation for storing images and graphs
+7. PDF generation with proper formatting
 """
 
 from datetime import datetime
 import os
-from typing import Dict, List, Tuple
+from typing import Dict, List, Tuple, Any
 import markdown2
 import cssutils
 import logging
 from ..utils.exceptions import ReportGenerationError
 from ..models.source_reference import SourceReferenceManager
 from ..config.settings import MODEL_CONFIG, PRIMARY_MODEL, PROMPT_CONFIG, REPORT_CONFIG
+from ..config.settings import MODEL_CONFIG, PRIMARY_MODEL, PROMPT_CONFIG, REPORT_CONFIG
+import weasyprint
 
 # Suppress CSS parser logs
 cssutils.log.setLevel(logging.CRITICAL)
 
 
 class ReportBuilder:
-    def __init__(self, model, logger):
+    def __init__(self, model, logger, base_filename):
         """
         レポートビルダーの初期化
 
@@ -40,6 +44,7 @@ class ReportBuilder:
         self.model = model
         self.logger = logger
         self.css = self._get_default_css()
+        self.base_filename = base_filename
 
     def generate_final_report(
         self,
@@ -48,6 +53,7 @@ class ReportBuilder:
         user_prompt: str,
         source_manager: SourceReferenceManager,
         mode: str = "standard",
+        visualization_data: Dict[str, Any] = None,
     ) -> str:
         """
         最終レポートを生成
@@ -58,6 +64,7 @@ class ReportBuilder:
             user_prompt: ユーザーのプロンプト
             source_manager: ソース参照マネージャー
             mode: レポート生成モード ("standard" または "summary")
+            visualization_data: 視覚化データ（グラフや表）
 
         Returns:
             str: 生成されたレポートテキスト
@@ -67,8 +74,16 @@ class ReportBuilder:
         """
         try:
             self.logger.section(f"最終レポート生成 (モード: {mode})")
+            
+            # 視覚化データがない場合は空の辞書を使用
+            if visualization_data is None:
+                visualization_data = {'graphs': [], 'tables': []}
+                
+            # 視覚化データの情報をログに出力
+            self.logger.log(f"視覚化データ: グラフ {len(visualization_data['graphs'])} 個, 表 {len(visualization_data['tables'])} 個")
+            
             final_messages = self._create_final_messages(research_text, source_manager, mode)
-            report_prompt = self._create_report_prompt(user_prompt, strategy_text, mode)
+            report_prompt = self._create_report_prompt(user_prompt, strategy_text, mode, visualization_data)
 
             final_report_text = self._get_complete_response(
                 final_messages,
@@ -86,16 +101,16 @@ class ReportBuilder:
         except Exception as e:
             raise ReportGenerationError(f"Error generating final report: {str(e)}")
 
-    def save_report(self, report_text: str, title: str) -> Tuple[str, str]:
+    def save_report(self, report_text: str, title: str) -> Tuple[str, str, str]:
         """
-        レポートをファイルに保存
+        レポートをファイルに保存し、画像ディレクトリを作成
 
         Args:
             report_text: レポートのテキスト
             title: レポートのタイトル
 
         Returns:
-            Tuple[str, str]: 生成されたHTMLとMarkdownファイルのパス
+            Tuple[str, str, str]: 生成されたHTML、Markdown、PDFファイルのパス
 
         Raises:
             ReportGenerationError: レポート保存時のエラー
@@ -104,21 +119,28 @@ class ReportBuilder:
             self.logger.section("レポートの保存")
 
             # 出力ディレクトリの作成
-            output_dir = 'reports'
-            os.makedirs(output_dir, exist_ok=True)
+            #output_dir = 'reports'
+            #os.makedirs(output_dir, exist_ok=True)
 
             # ファイル名の生成
-            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-            base_filename = os.path.join(output_dir, f"report_{timestamp}")
+            #timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+            #base_filename = os.path.join(output_dir, f"report_{timestamp}")
+            base_filename = self.base_filename
+            
+            # 画像ディレクトリの作成
+            image_dir = f"{base_filename}_images"
+            self.logger.log(f"画像ディレクトリ: {image_dir}")
 
             # レポートの保存
-            html_path = self._save_html(report_text, f"{base_filename}.html", title)
-            md_path = self._save_markdown(report_text, f"{base_filename}.md", title)
+            html_path = self._save_html(report_text, f"{base_filename}.html", title, image_dir)
+            md_path = self._save_markdown(report_text, f"{base_filename}.md", title, image_dir)
+            pdf_path = self._save_pdf(html_path, f"{base_filename}.pdf", title)
 
             self.logger.log(f"HTMLレポートを生成しました: {html_path}")
             self.logger.log(f"Markdownレポートを生成しました: {md_path}")
+            self.logger.log(f"PDFレポートを生成しました: {pdf_path}")
 
-            return html_path, md_path
+            return html_path, md_path, pdf_path
 
         except Exception as e:
             raise ReportGenerationError(f"Error saving report: {str(e)}")
@@ -155,31 +177,13 @@ class ReportBuilder:
             self.logger.log("サマリーモード: レポート全体を一度に生成します")
         else:
             self.logger.log("標準モード: レポートを章ごとに生成します")
-
-            
-        response = self.model.generate_response(
-            MODEL_CONFIG[PRIMARY_MODEL],
-            messages,
-            [{"text": prompt_text}],
-            {
-                'temperature': PROMPT_CONFIG['temperature']['default'],
-                'maxTokens': PROMPT_CONFIG['max_tokens'],
-            },
-        )
-
-        current_text = response['output']['message']['content'][0]['text']
-        complete_response = current_text
-        
-        self.logger.log("レポートのサマリー:")
-        summary = current_text[:500] + "..." if len(current_text) > 500 else current_text
-        self.logger.log(summary)
             
         while attempt < max_attempts:
             if attempt != 0:
                 if mode == "summary":
                     #for summary
                     message_text = """
-                    調査戦略に基づいて、続きがある場合は続きを出力してください。続きがない場合は、「レポートの終了」と呟いてください。「次の章へ進むか？」は聞かないでください。
+                    調査戦略に基づいて、続きがある場合は続きを出力してください。続きがない場合は、「レポートの終了」とだけ呟く。「次の章へ進むか？」は聞かないでください。
                     """
                 else:
                     #for standard
@@ -269,6 +273,7 @@ class ReportBuilder:
                 5: 箇条書きではなく長文、または、表を出力する 
                 6: レポート分は客観的なデータポイントについて詳細に解説し、それを論拠として、考察と推論について述べる順番でロジックを展開する
                 7: 専門的な説明や具体的な内容、データや数値など詳細なコンテキストは全て維持する
+                8: 必要に応じてダウンロードした画像や作成できたグラフ画像を活用し、視覚的な情報も提供する
             """
         else:
             #summary mode
@@ -278,6 +283,7 @@ class ReportBuilder:
                 5: 箇条書き・表は利用して良い。
                 6: レポート分は客観的なデータポイントについて解説し、それを論拠として、考察と推論について述べる順番でロジックを展開する
                 7: 専門的な説明や具体的な内容、データや数値など詳細なコンテキストは必要なところだけ維持する
+                8: 必要に応じてダウンロードした画像や作成できたグラフ画像を活用し、視覚的な情報も提供する
             """
 
         return [
@@ -300,17 +306,24 @@ class ReportBuilder:
 1: Do not include statements about waiting for responses or confirmations or questions.
 2: Do not include statements about next chapter
 {output_rule}
-8: 文体はレポート文体で長文とする。
-9: 章をまたいで、Report全体の文脈の流れを維持する。
-10: 最終的にすべての章立ての情報を出力し終わった場合は、ひとこと「レポートの終了」と呟く。
+9: 文体はレポート文体で長文とする。
+10: 章をまたいで、Report全体の文脈の流れを維持する。
+11: 画像やグラフを使用する場合は、検索フェーズでダウンロードに成功したコンテンツや作成が成功したグラフ画像からののみ表示する。本文と適切に配置し、レイアウトに配慮する。
+12: 最終的にすべての章立ての情報を出力し終わった場合は、ひとこと「レポートの終了」と呟く。
 '''
-                        # 11: インターネットの検索からの情報を引用している場合にのみ、該当するURLとハイパーリンクを作ってください。架空の参考文献を作り出さないでください。
+                        # 14: インターネットの検索からの情報を引用している場合にのみ、該当するURLとハイパーリンクを作ってください。架空の参考文献を作り出さないでください。
                     }
                 ],
             }
         ]
 
-    def _create_report_prompt(self, user_prompt: str, strategy_text: str, mode: str = "standard") -> str:
+    def _create_report_prompt(
+        self, 
+        user_prompt: str, 
+        strategy_text: str, 
+        mode: str = "standard", 
+        visualization_data: Dict[str, Any] = None
+    ) -> str:
         """
         レポート生成プロンプトの作成
 
@@ -318,6 +331,7 @@ class ReportBuilder:
             user_prompt: ユーザーのプロンプト
             strategy_text: 調査戦略テキスト
             mode: レポート生成モード ("standard" または "summary")
+            visualization_data: 視覚化データ（グラフや表）
 
         Returns:
             str: レポート生成プロンプト
@@ -328,6 +342,9 @@ class ReportBuilder:
             以下の点に注意してレポートを作成してください：
 
             * ナレーティブに文章を書く。安易に箇条書きを用いない
+            * 必要に応じて、情報収集フェーズで画像検索ツールを使用してダウンロードした関連画像を相対パスとしてレポートに含める
+            * 必要に応じて、情報収集フェーズでグラフ作成ツールを仕様して作成したグラフ画像を相対パスとしてレポートに含め、視覚的に理解しやすい資料とする
+            * 画像やグラフを使用する場合は、本文との配置を工夫し、読みやすいレイアウトにする
             """
         else:
             #summary mode
@@ -336,7 +353,21 @@ class ReportBuilder:
             以下の点に注意してレポートを作成してください：
 
             * ナレーティブに文章を書く。
+            * 必要に応じて、情報収集フェーズで画像検索ツールを使用してダウンロードした関連画像を相対パスとしてレポートに含める
+            * 必要に応じて、情報収集フェーズでグラフ作成ツールを仕様して作成したグラフ画像を相対パスとしてレポートに含め、視覚的に理解しやすい資料とする
+            * 画像やグラフを使用する場合は、本文との配置を工夫し、読みやすいレイアウトにする
             """
+        
+        # 画像ディレクトリ
+        image_dir = f"{self.base_filename}_images"
+        
+        # 視覚化データの情報を追加
+        visualization_info = ""
+        if visualization_data and visualization_data.get('graphs'):
+            visualization_info += "\n\n以下のグラフ画像が利用可能です。適切な箇所でこれらを参照してください：\n"
+            for i, graph in enumerate(visualization_data['graphs']):
+                if 'graph_path' in graph:
+                    visualization_info += f"- グラフ{i+1}: {graph['graph_path']} (タイトル: {graph.get('title', '不明')}, タイプ: {graph.get('type', '不明')})\n"
         
         return f'''あなたは優秀なリサーチャーです。
 あなたは「{user_prompt}」 という調査依頼を受けとっています。
@@ -345,6 +376,7 @@ class ReportBuilder:
 マークダウン形式のレポートを作成してください。
 {output_instruction}
 
+* 保存した画像や、作成したグラフ画像を配置しているフォルダは{image_dir}です
 * 客観的なデータ、特に数字を用いた分析に基づいた論述を用いる
 * レポート分は客観的なデータポイントについて詳細に解説し、それを論拠として、考察と推論について述べる順番でロジックを展開する
 * 複数の視点からの考察を行う。ただし視点の主体は明らかにする
@@ -352,6 +384,11 @@ class ReportBuilder:
 * 具体例や事例の適切な活用をしてください。具体例は説得力が増します
 * 結論の妥当性と説得力を意識して書いてください
 * 箇条書きを使う場合は**必ずその下に詳細な説明を入れて**レポートの主張を明瞭にしてください
+* 数値データを扱う場合は、グラフ生成ツールからの出力画像を読み込み視覚的に表現することを検討してください
+* 画像データを扱う場合は、ダウンロード済みファイルを読み込み視覚的に表現することを検討してください
+* 画像やグラフを使用する場合は、本文と適切に配置し、レイアウトに配慮してください
+* 存在しない参考文献を参照しないでください
+{visualization_info}
 '''
 
     def _get_default_css(self) -> str:
@@ -455,11 +492,57 @@ class ReportBuilder:
         tr:hover {
             background-color: #f1f1f1;
         }
+        /* Image styling */
+        img {
+            max-width: 100%;
+            height: auto;
+            margin: 20px 0;
+            border-radius: 4px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        .image-container {
+            text-align: center;
+            margin: 20px 0;
+        }
+        .image-caption {
+            font-size: 0.9em;
+            color: #666;
+            margin-top: 5px;
+        }
+        /* Layout for side-by-side content */
+        .flex-container {
+            display: flex;
+            flex-wrap: wrap;
+            margin: 20px 0;
+            gap: 20px;
+        }
+        .flex-item {
+            flex: 1 1 300px;
+        }
+        /* PDF specific styles */
+        @page {
+            margin: 1cm;
+        }
         """
 
-    def _save_markdown(self, markdown_text: str, output_path: str, title: str) -> str:
-        """Markdownファイルの保存"""
+    def _save_markdown(self, markdown_text: str, output_path: str, title: str, image_dir: str) -> str:
+        """
+        Markdownファイルの保存
+        
+        Args:
+            markdown_text: マークダウンテキスト
+            output_path: 出力ファイルパス
+            title: レポートタイトル
+            image_dir: 画像ディレクトリパス
+            
+        Returns:
+            str: 保存したファイルのパス
+        """
         current_time = datetime.now().strftime('%Y年%m月%d日 %H:%M')
+        
+        # 画像ディレクトリへの相対パスを取得
+        image_rel_path = os.path.basename(image_dir)
+        
         markdown_content = f"""# {title}
 
 作成日時: {current_time}
@@ -470,13 +553,27 @@ class ReportBuilder:
             f.write(markdown_content)
         return output_path
 
-    def _save_html(self, markdown_text: str, output_path: str, title: str) -> str:
-        """HTMLファイルの保存"""
+    def _save_html(self, markdown_text: str, output_path: str, title: str, image_dir: str) -> str:
+        """
+        HTMLファイルの保存
+        
+        Args:
+            markdown_text: マークダウンテキスト
+            output_path: 出力ファイルパス
+            title: レポートタイトル
+            image_dir: 画像ディレクトリパス
+            
+        Returns:
+            str: 保存したファイルのパス
+        """
         # Use markdown2 with extras, but without link-patterns
         html_content = markdown2.markdown(
             markdown_text, extras=['tables', 'fenced-code-blocks']
         )
         current_time = datetime.now().strftime('%Y年%m月%d日 %H:%M')
+        
+        # 画像ディレクトリへの相対パスを取得
+        image_rel_path = os.path.basename(image_dir)
 
         html_document = f"""
         <!DOCTYPE html>
@@ -493,7 +590,7 @@ class ReportBuilder:
             <div class="content">
                 <h1>{title}</h1>
                 <div class="metadata">
-                    作成日時: {current_time}
+                    作成日時: {current_time}<br>
                 </div>
                 {html_content}
             </div>
@@ -504,3 +601,30 @@ class ReportBuilder:
         with open(output_path, 'w', encoding='utf-8') as f:
             f.write(html_document)
         return output_path
+
+    def _save_pdf(self, html_path: str, output_path: str, title: str) -> str:
+        """
+        PDFファイルの保存
+        
+        Args:
+            html_path: HTMLファイルのパス
+            output_path: 出力ファイルパス
+            title: レポートタイトル
+            
+        Returns:
+            str: 保存したファイルのパス
+        """
+        try:
+            # HTMLファイルからPDFを生成
+            html = weasyprint.HTML(filename=html_path)
+            pdf = html.write_pdf()
+            
+            # PDFファイルを保存
+            with open(output_path, 'wb') as f:
+                f.write(pdf)
+                
+            return output_path
+            
+        except Exception as e:
+            self.logger.log(f"PDF生成エラー: {str(e)}")
+            raise ReportGenerationError(f"Error generating PDF: {str(e)}")

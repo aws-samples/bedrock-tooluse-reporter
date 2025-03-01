@@ -1,6 +1,10 @@
-boto3
-beautifulsoup4
-urllib3
-requests
-markdown2
-cssutils
+boto3>=1.28.0
+markdown2>=2.4.0
+beautifulsoup4>=4.12.0
+requests>=2.31.0
+matplotlib>=3.7.0
+numpy>=1.24.0
+japanize-matplotlib>=1.1.3
+cssutils>=2.7.0
+PyMuPDF>=1.22.0
+weasyprint>=60.0

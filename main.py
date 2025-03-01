@@ -13,6 +13,8 @@ import argparse
 from logger import DualLogger
 from src.core.research_manager import ResearchManager
 from src.utils.exceptions import ResearchError
+import os
+from datetime import datetime
 
 
 def main():
@@ -38,13 +40,28 @@ def main():
     logger = DualLogger()
 
     try:
+        # 出力ディレクトリの作成
+        output_dir = 'reports'
+        os.makedirs(output_dir, exist_ok=True)
+
+        # ファイル名の生成
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        base_filename = os.path.join(output_dir, f"report_{timestamp}")
+        
+        # 画像ディレクトリの作成
+        image_dir = f"{base_filename}_images"
+        os.makedirs(image_dir, exist_ok=True)
+        logger.log(f"画像ディレクトリを作成しました: {image_dir}")
+
+
         # Initialize and execute research manager
-        research_manager = ResearchManager(logger)
-        html_path, md_path = research_manager.execute_research(args.prompt, args.mode)
+        research_manager = ResearchManager(logger,base_filename)
+        html_path, md_path, pdf_path = research_manager.execute_research(args.prompt, args.mode)
 
         logger.log(f"研究が完了しました。(モード: {args.mode})")
         logger.log(f"HTMLレポート: {html_path}")
         logger.log(f"Markdownレポート: {md_path}")
+        logger.log(f"PDFレポート: {pdf_path}")
 
     except ResearchError as e:
         logger.log(f"エラーが発生しました: {str(e)}")

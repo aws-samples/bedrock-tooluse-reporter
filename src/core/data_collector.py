@@ -10,10 +10,14 @@ The data collection process includes:
 2. Retrieving content from URLs
 3. Processing and organizing collected data
 4. Tracking source references
+5. Searching and saving images
+6. Generating graphs from data
 """
 
 from datetime import datetime
-from typing import Dict, List, Optional, Tuple
+import os
+import json
+from typing import Dict, List, Optional, Tuple, Set
 from ..models.bedrock import BedrockModel
 from ..models.source_reference import SourceReference, SourceReferenceManager
 from ..utils.tool_handler import ToolHandler
@@ -35,6 +39,19 @@ class DataCollector:
         self.tool_handler = tool_handler
         self.logger = logger
         self.source_manager = SourceReferenceManager()
+        self.current_image_dir = None
+        self.has_retrieved_image = False  # 画像取得フラグ
+
+    def set_image_directory(self, image_dir: str) -> None:
+        """
+        画像ディレクトリを設定
+
+        Args:
+            image_dir: 画像を保存するディレクトリのパス
+        """
+        self.current_image_dir = image_dir
+        self.tool_handler.set_image_directory(image_dir)
+        self.logger.log(f"DataCollector: 画像ディレクトリを設定: {image_dir}")
 
     def collect_research_data(
         self,
@@ -61,6 +78,7 @@ class DataCollector:
             DataCollectionError: データ収集時のエラー
         """
         self.logger.section("情報収集フェーズ開始")
+        self.has_retrieved_image = False  # 画像取得フラグをリセット
 
         research_prompt = self._create_research_prompt(user_prompt)
         conversation['F'] = []
@@ -76,6 +94,12 @@ class DataCollector:
         try:
             for i in range(max_iterations):  # モードに基づいた最大反復回数
                 self.logger.subsection(f"情報収集ステップ {i+1}/{max_iterations}")
+
+                # 画像が取得されていない場合、最後の反復で強制的に画像検索を促す
+                if not self.has_retrieved_image and i == max_iterations - 1:
+                    self.logger.log("画像が取得されていないため、画像検索を促します")
+                    image_prompt = self._create_image_search_prompt(user_prompt)
+                    conversation['F'].append({"role": "user", "content": [{"text": image_prompt}]})
 
                 response = self.model.generate_response(
                     MODEL_CONFIG[PRIMARY_MODEL],
@@ -103,21 +127,40 @@ class DataCollector:
                 )
 
                 if tool_use['name'] == 'is_finished':
-                    conversation['F'].append(
-                        {
-                            'role': 'user',
-                            'content': [
-                                {
-                                    'toolResult': {
-                                        'toolUseId': tool_use['toolUseId'],
-                                        'content': [{'text': 'finished'}],
+                    # 画像が取得されていない場合、終了せずに画像検索を促す
+                    if not self.has_retrieved_image and i < max_iterations - 1:
+                        self.logger.log("画像が取得されていないため、終了せずに画像検索を促します")
+                        image_prompt = self._create_image_search_prompt(user_prompt)
+                        conversation['F'].append(
+                            {
+                                'role': 'user',
+                                'content': [
+                                    {
+                                        'toolResult': {
+                                            'toolUseId': tool_use['toolUseId'],
+                                            'content': [{'text': image_prompt}],
+                                        }
                                     }
-                                }
-                            ],
-                        }
-                    )
-                    self.logger.log("情報収集完了（明示的終了）")
-                    break
+                                ],
+                            }
+                        )
+                        continue
+                    else:
+                        conversation['F'].append(
+                            {
+                                'role': 'user',
+                                'content': [
+                                    {
+                                        'toolResult': {
+                                            'toolUseId': tool_use['toolUseId'],
+                                            'content': [{'text': 'finished'}],
+                                        }
+                                    }
+                                ],
+                            }
+                        )
+                        self.logger.log("情報収集完了（明示的終了）")
+                        break
 
                 # ツールの実行と結果の処理
                 result, citation = self._execute_tool(tool_use)
@@ -129,11 +172,48 @@ class DataCollector:
                 # ツール結果を追加
                 self._update_conversation(conversation, tool_use, result)
 
+            # 最終チェック: 画像が取得されていない場合は強制的に画像検索を実行
+            if not self.has_retrieved_image:
+                self.logger.log("最終チェック: 画像が取得されていないため、強制的に画像検索を実行します")
+                image_result = self._force_image_search(user_prompt)
+                if image_result:
+                    collected_data.append(image_result)
+
         except Exception as e:
             raise DataCollectionError(f"Error during data collection: {str(e)}")
 
         self.logger.section("情報収集フェーズ完了")
         return collected_data, self.source_manager
+
+    def _force_image_search(self, user_prompt: str) -> Optional[str]:
+        """
+        強制的に画像検索を実行
+
+        Args:
+            user_prompt: ユーザーのプロンプト
+
+        Returns:
+            Optional[str]: 画像検索結果。失敗した場合はNone
+        """
+        try:
+            self.logger.log(f"強制的に画像検索を実行: '{user_prompt}'")
+            result = self.tool_handler.image_search(query=user_prompt, max_results=3)
+            
+            # 結果をJSONとしてパース
+            result_data = json.loads(result)
+            
+            # 画像が取得できたかチェック
+            if 'images' in result_data and result_data['images']:
+                self.has_retrieved_image = True
+                self.logger.log(f"強制的な画像検索で {len(result_data['images'])} 枚の画像を取得しました")
+                return f"強制的な画像検索の結果:\n{result}"
+            else:
+                self.logger.log("強制的な画像検索でも画像を取得できませんでした")
+                return None
+                
+        except Exception as e:
+            self.logger.log(f"強制的な画像検索中にエラーが発生しました: {str(e)}")
+            return None
 
     def _create_research_prompt(self, user_prompt: str) -> List[Dict]:
         """研究プロンプトの作成"""
@@ -142,13 +222,31 @@ class DataCollector:
                 'text': f'''あなたは優秀なリサーチャーです。
 あなたは「{user_prompt}」 という調査依頼を受けとっています。
 ユーザーはレポートのフレームワーク与えます。
-ただしあなたは Web 検索をするか、検索結果の URL にアクセスをして情報を取得し、その結果を元に自分自身で考察する以外のことはできません。
-あなたは、どうやって調査を進めるか考えたかと保持しているツールを使用して、必要な情報をすべて集めてください。
+あなたは、Web検索、検索結果のURLへのアクセス、画像検索による画像取得、グラフ画像生成などのツールを使用して情報を取得し、その結果を元に自分自身で考察することができます。
 
-情報を引用する際は、必ず引用元を [※N] の形式で明記してください。
+以下のツールを活用してください：
+1. search: Webで情報を検索する
+2. get_content: URLからコンテンツを取得する
+3. image_search: 関連する画像を検索して取得して保存する
+4. generate_graph: 数値データからグラフ画像（折れ線グラフ・棒グラフ・円グラフ）を生成する
+5. is_finished: 情報収集を完了する
+
+特に、以下の点に注意してください：
+- 必ず1つ以上の画像を取得するために、image_searchツールを使用して関連画像を検索・保存してください
+- 数値データを扱う場合は、generate_graphツールを使用してグラフ画像（棒グラフ・折れ線グラフ・円グラフ）を作成して保存しレポートに参照させることを検討してください
+- 視覚的な情報が役立つ場合は、image_searchツールを使用して関連画像を取得して保存し、レポートに参照させることを検討してください
+- 情報を引用する際は、必ず引用元を [※N] の形式で明記してください
 '''
             }
         ]
+
+    def _create_image_search_prompt(self, user_prompt: str) -> str:
+        """画像検索を促すプロンプトの作成"""
+        return f'''
+レポートの視覚的な情報を充実させるために、「{user_prompt}」に関連する画像を検索して取得してください。
+image_searchツールを使用して、関連する画像を少なくとも1つ以上取得することが重要です。
+取得した画像はレポートで参照できるようになります。
+'''
 
     def _log_ai_thinking(self, response: Dict):
         """AIの思考プロセスをログに記録"""
@@ -173,9 +271,11 @@ class DataCollector:
 
         result = None
         citation = None
+        
         if tool_use['name'] == 'search':
             result = self.tool_handler.search(**tool_use['input'])
             self.logger.log("\n検索結果:")
+            
         elif tool_use['name'] == 'get_content':
             result, title = self.tool_handler.get_content(**tool_use['input'])
             if result:
@@ -189,6 +289,42 @@ class DataCollector:
                     )
                 )
             self.logger.log("\nコンテンツ取得結果:")
+            
+        elif tool_use['name'] == 'image_search':
+            # 画像ディレクトリが設定されていることを確認
+            if self.current_image_dir:
+                result = self.tool_handler.image_search(**tool_use['input'])
+                # 画像が取得できたかチェック
+                try:
+                    result_data = json.loads(result)
+                    if 'images' in result_data and result_data['images']:
+                        self.has_retrieved_image = True
+                        self.logger.log(f"\n画像検索結果: {len(result_data['images'])} 枚の画像を取得しました")
+                    else:
+                        self.logger.log("\n画像検索結果: 画像を取得できませんでした")
+                except:
+                    self.logger.log("\n画像検索結果: 結果の解析に失敗しました")
+            else:
+                result = '{"error": "画像ディレクトリが設定されていません"}'
+                self.logger.log("\n画像ディレクトリが設定されていません")
+                
+        elif tool_use['name'] == 'generate_graph':
+            # 画像ディレクトリが設定されていることを確認
+            if self.current_image_dir:
+                result = self.tool_handler.generate_graph(**tool_use['input'])
+                # グラフが生成できたかチェック
+                try:
+                    result_data = json.loads(result)
+                    if 'graph_path' in result_data:
+                        self.has_retrieved_image = True  # グラフも画像として扱う
+                        self.logger.log("\nグラフ生成結果: グラフを生成しました")
+                    else:
+                        self.logger.log("\nグラフ生成結果: グラフの生成に失敗しました")
+                except:
+                    self.logger.log("\nグラフ生成結果: 結果の解析に失敗しました")
+            else:
+                result = '{"error": "画像ディレクトリが設定されていません"}'
+                self.logger.log("\n画像ディレクトリが設定されていません")
 
         if result:
             display_result = result[:500] + "..." if len(result) > 500 else result
