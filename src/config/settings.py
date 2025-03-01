@@ -30,12 +30,12 @@ MAX_PRE_RESEARCH_SEARCHES = 40  # 標準モードでの事前調査の最大検�
 SUMMARY_PRE_RESEARCH_SEARCHES = 3  # サマリーモードでの事前調査の最大検索回数
 
 MAX_RESEARCH_SEARCHES = 40  # 標準モードでの調査の最大検索回数
-SUMMARY_RESEARCH_SEARCHES = 7  # サマリーモードでの調査の最大検索回数
+SUMMARY_RESEARCH_SEARCHES = 10  # サマリーモードでの調査の最大検索回数
 
 # LLM接続設定
 LLM_CONNECTION = {
-    'timeout': 600,  # APIリクエストのタイムアウト（秒）
-    'max_retries': 5,  # 最大リトライ回数
+    'timeout': 1200,  # APIリクエストのタイムアウト（秒）
+    'max_retries': 8,  # 最大リトライ回数
     'base_delay': 20,  # 初期バックオフ遅延（秒）
     'max_delay': 300,  # 最大バックオフ遅延（秒）
 }
@@ -75,6 +75,97 @@ TOOL_CONFIG = {
                             }
                         },
                         'required': ['url'],
+                    }
+                },
+            }
+        },
+        {
+            'toolSpec': {
+                'name': 'image_search',
+                'description': '画像を検索、取得して保存する',
+                'inputSchema': {
+                    'json': {
+                        'type': 'object',
+                        'properties': {
+                            'query': {
+                                'type': 'string',
+                                'description': '検索する画像のキーワード。半角スペースで区切ることで複数のキーワードを受け付ける。',
+                            },
+                            'max_results': {
+                                'type': 'integer',
+                                'description': '取得する最大画像数（デフォルト: 5）',
+                            }
+                        },
+                        'required': ['query'],
+                    }
+                },
+            }
+        },
+        {
+            'toolSpec': {
+                'name': 'generate_graph',
+                'description': 'データからグラフを生成する',
+                'inputSchema': {
+                    'json': {
+                        'type': 'object',
+                        'properties': {
+                            'graph_type': {
+                                'type': 'string',
+                                'description': 'グラフの種類（line: 折れ線グラフ, bar: 棒グラフ, pie: 円グラフ, scatter: 散布図）',
+                                'enum': ['line', 'bar', 'pie', 'scatter', 'horizontal_bar']
+                            },
+                            'title': {
+                                'type': 'string',
+                                'description': 'グラフのタイトル',
+                            },
+                            'x_label': {
+                                'type': 'string',
+                                'description': 'X軸のラベル（折れ線グラフ、棒グラフ、散布図の場合）',
+                            },
+                            'y_label': {
+                                'type': 'string',
+                                'description': 'Y軸のラベル（折れ線グラフ、棒グラフ、散布図の場合）',
+                            },
+                            'labels': {
+                                'type': 'array',
+                                'description': 'データのラベル（X軸の値や凡例）',
+                                'items': {
+                                    'type': 'string'
+                                }
+                            },
+                            'data': {
+                                'type': 'array',
+                                'description': 'グラフ化するデータ値',
+                                'items': {
+                                    'type': 'number'
+                                }
+                            },
+                            'series_labels': {
+                                'type': 'array',
+                                'description': '複数系列がある場合の系列ラベル（オプション）',
+                                'items': {
+                                    'type': 'string'
+                                }
+                            },
+                            'multi_data': {
+                                'type': 'array',
+                                'description': '複数系列のデータ（オプション）。各系列のデータ配列を含む2次元配列。',
+                                'items': {
+                                    'type': 'array',
+                                    'items': {
+                                        'type': 'number'
+                                    }
+                                }
+                            },
+                            'colors': {
+                                'type': 'array',
+                                'description': 'グラフの色（オプション）',
+                                'items': {
+                                    'type': 'string'
+                                }
+                            }
+                        },
+                        'required': ['graph_type', 'title'],
                     }
                 },
             }
@@ -132,4 +223,21 @@ REPORT_CONFIG = {
         'standard': 'chapter',  # 標準モードでは章ごとに出力
         'summary': 'full',  # サマリーモードではレポート全体を一度に出力
     },
+}
+
+# 画像設定
+IMAGE_CONFIG = {
+    'max_images': 10,  # 1回の検索で取得する最大画像数
+    'max_size': 5 * 1024 * 1024,  # 画像の最大サイズ（5MB）
+    'allowed_formats': ['jpg', 'jpeg', 'png', 'gif', 'webp'],  # 許可する画像形式
+}
+
+# グラフ設定
+GRAPH_CONFIG = {
+    'default_figsize': (10, 6),  # デフォルトのグラフサイズ（インチ）
+    'dpi': 100,  # 解像度（dots per inch）
+    'default_colors': [  # デフォルトの色パレット
+        '#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd',
+        '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf'
+    ],
 }

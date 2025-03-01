@@ -9,10 +9,13 @@ The research process includes:
 1. Pre-research data collection
 2. Initial discussion to determine research strategy
 3. Detailed data collection based on the strategy
-4. Report generation from collected data
+4. Report preparation to create visualizations from collected data
+5. Report generation from collected data
 """
 
-from typing import Dict, List, Tuple
+from typing import Dict, List, Tuple, Any, Optional
+import json
+import re
 from ..models.bedrock import BedrockModel
 from ..models.source_reference import SourceReferenceManager
 from ..utils.tool_handler import ToolHandler
@@ -27,11 +30,12 @@ from ..config.settings import (
     SUMMARY_CONVERSATION_TURNS,
     MAX_PRE_RESEARCH_SEARCHES,
     SUMMARY_PRE_RESEARCH_SEARCHES,
+    TOOL_CONFIG,
 )
 
 
 class ResearchManager:
-    def __init__(self, logger):
+    def __init__(self, logger, base_filename):
         """
         研究マネージャーの初期化
 
@@ -40,14 +44,16 @@ class ResearchManager:
         """
         self.logger = logger
         self.model = BedrockModel(logger)
-        self.tool_handler = ToolHandler(logger)
+        self.tool_handler = ToolHandler(logger,base_filename)
         self.data_collector = DataCollector(self.model, self.tool_handler, logger)
-        self.report_builder = ReportBuilder(self.model, logger)
+        self.report_builder = ReportBuilder(self.model, logger, base_filename)
         self.conversation = {'A': [], 'I': [], 'F': []}
         self.source_manager = SourceReferenceManager()
         self.mode = "standard"  # デフォルトは標準モード
+        self.current_image_dir = None
+        self.basefilename = base_filename
 
-    def execute_research(self, user_prompt: str, mode: str = "standard") -> Tuple[str, str]:
+    def execute_research(self, user_prompt: str, mode: str = "standard") -> Tuple[str, str, str]:
         """
         研究プロセスの実行
 
@@ -56,7 +62,7 @@ class ResearchManager:
             mode: 研究モード ("standard" または "summary")
 
         Returns:
-            Tuple[str, str]: 生成されたHTMLとMarkdownレポートのパス
+            Tuple[str, str, str]: 生成されたHTML、Markdown、PDFレポートのパス
 
         Raises:
             ResearchError: 研究プロセス中のエラー
@@ -67,6 +73,11 @@ class ResearchManager:
                 self.mode = "standard"  # 不明なモードの場合はデフォルトに設定
                 
             self.logger.section(f"リサーチ開始: {user_prompt} (モード: {self.mode})")
+
+            # 画像ディレクトリを取得して設定
+            # レポートのファイル名から画像ディレクトリ名を取得（拡張子を除く）
+            # DataCollectorに画像ディレクトリを設定
+            self.data_collector.set_image_directory(f"{self.basefilename}_images")
 
             # 事前調査
             pre_research_data = self._conduct_pre_research(user_prompt)
@@ -85,6 +96,13 @@ class ResearchManager:
             )
             self.source_manager = source_manager
 
+            # レポート事前準備（データの可視化）
+            visualization_data = self._prepare_report_visualizations(
+                collected_data,
+                user_prompt,
+                strategy_text
+            )
+
             # 収集データの整理
             research_text = self._extract_conversation_text()
             self._log_research_summary(research_text)
@@ -96,13 +114,16 @@ class ResearchManager:
                 user_prompt,
                 self.source_manager,
                 self.mode,
+                visualization_data,
             )
 
             # レポート保存
-            return self.report_builder.save_report(
+            html_path, md_path, pdf_path = self.report_builder.save_report(
                 final_report,
                 f"調査レポート: {user_prompt}",
             )
+            
+            return html_path, md_path, pdf_path
 
         except Exception as e:
             raise ResearchError(f"Error during research process: {str(e)}")
@@ -184,6 +205,212 @@ class ResearchManager:
 
         return strategy_text
 
+    def _prepare_report_visualizations(
+        self, collected_data: List[str], user_prompt: str, strategy_text: str
+    ) -> Dict[str, Any]:
+        """
+        レポート事前準備フェーズ - データの可視化
+
+        収集したデータから表やグラフを作成し、視覚的な情報を準備します。
+
+        Args:
+            collected_data: 収集したデータのリスト
+            user_prompt: ユーザーの研究テーマ
+            strategy_text: 調査戦略テキスト
+
+        Returns:
+            Dict[str, Any]: 作成した視覚化データ（グラフパスなど）
+        """
+        self.logger.section("レポート事前準備フェーズ")
+        self.logger.log("目的: データの可視化と視覚的情報の準備")
+
+        visualization_data = {
+            'graphs': [],
+            'tables': [],
+        }
+
+        # 収集したデータを結合
+        combined_data = "\n\n".join(collected_data)
+
+        # 数値データの抽出とグラフ化のためのプロンプト
+        visualization_prompt = self._create_visualization_prompt(user_prompt, strategy_text, combined_data)
+        
+        # 会話履歴の初期化
+        visualization_conversation = []
+        visualization_conversation.append(
+            {"role": "user", "content": [{"text": visualization_prompt}]}
+        )
+
+        # AIモデルに視覚化の指示を出す
+        response = self.model.generate_response(
+            MODEL_CONFIG[PRIMARY_MODEL],
+            visualization_conversation,
+            [{"text": "あなたは優秀なデータ分析者です。収集したデータから視覚的な情報を作成してください。"}],
+            {'temperature': 0},
+            TOOL_CONFIG,
+        )
+
+        # AIの思考プロセスを出力
+        self.logger.log("AI の視覚化計画:")
+        for content in response['output']['message']['content']:
+            if 'text' in content:
+                self.logger.log(content['text'])
+        self.logger.log("")
+
+        # ツール使用の処理
+        tool_use = self.tool_handler.process_tool_response(response)
+        
+        # ツール使用がない場合は終了
+        if not tool_use:
+            self.logger.log("視覚化のためのツール使用なし")
+            return visualization_data
+
+        # アシスタントメッセージを追加
+        visualization_conversation.append(
+            {
+                'role': 'assistant',
+                'content': response['output']['message']['content'],
+            }
+        )
+
+        # グラフ生成ツールの使用を処理
+        if tool_use['name'] == 'generate_graph':
+            result = self.tool_handler.generate_graph(**tool_use['input'])
+            
+            try:
+                result_data = json.loads(result)
+                if 'graph_path' in result_data:
+                    self.logger.log(f"グラフを生成しました: {result_data['graph_path']}")
+                    visualization_data['graphs'].append(result_data)
+            except:
+                self.logger.log("グラフ生成結果の解析に失敗しました")
+                
+            # ツール結果を追加
+            visualization_conversation.append(
+                {
+                    'role': 'user',
+                    'content': [
+                        {
+                            'toolResult': {
+                                'toolUseId': tool_use['toolUseId'],
+                                'content': [{'text': result}],
+                            }
+                        }
+                    ],
+                }
+            )
+            
+            # 追加のグラフ生成を試みる
+            for _ in range(2):  # 最大2回の追加グラフ生成を試みる
+                response = self.model.generate_response(
+                    MODEL_CONFIG[PRIMARY_MODEL],
+                    visualization_conversation,
+                    [{"text": "他にも視覚化できるデータがあれば、グラフを生成してください。"}],
+                    {'temperature': 0},
+                    TOOL_CONFIG,
+                )
+                
+                tool_use = self.tool_handler.process_tool_response(response)
+                if not tool_use or tool_use['name'] != 'generate_graph':
+                    break
+                    
+                visualization_conversation.append(
+                    {
+                        'role': 'assistant',
+                        'content': response['output']['message']['content'],
+                    }
+                )
+                
+                result = self.tool_handler.generate_graph(**tool_use['input'])
+                
+                try:
+                    result_data = json.loads(result)
+                    if 'graph_path' in result_data:
+                        self.logger.log(f"追加のグラフを生成しました: {result_data['graph_path']}")
+                        visualization_data['graphs'].append(result_data)
+                except:
+                    self.logger.log("追加のグラフ生成結果の解析に失敗しました")
+                    
+                visualization_conversation.append(
+                    {
+                        'role': 'user',
+                        'content': [
+                            {
+                                'toolResult': {
+                                    'toolUseId': tool_use['toolUseId'],
+                                    'content': [{'text': result}],
+                                }
+                            }
+                        ],
+                    }
+                )
+
+        # 表データの抽出
+        tables = self._extract_tables_from_data(combined_data)
+        if tables:
+            visualization_data['tables'] = tables
+            self.logger.log(f"{len(tables)} 個の表データを抽出しました")
+
+        self.logger.log(f"視覚化データの準備完了: グラフ {len(visualization_data['graphs'])} 個, 表 {len(visualization_data['tables'])} 個")
+        return visualization_data
+
+    def _extract_tables_from_data(self, data: str) -> List[Dict[str, Any]]:
+        """
+        データから表を抽出
+
+        Args:
+            data: 収集したデータテキスト
+
+        Returns:
+            List[Dict[str, Any]]: 抽出した表データのリスト
+        """
+        tables = []
+        
+        # マークダウン形式の表を検出
+        markdown_tables = re.findall(r'(\|[^\n]+\|\n\|[-:| ]+\|\n(?:\|[^\n]+\|\n)+)', data)
+        
+        for i, table in enumerate(markdown_tables):
+            tables.append({
+                'type': 'markdown',
+                'content': table,
+                'id': f'table_{i+1}'
+            })
+            
+        return tables
+
+    def _create_visualization_prompt(self, user_prompt: str, strategy_text: str, data: str) -> str:
+        """
+        視覚化プロンプトの作成
+
+        Args:
+            user_prompt: ユーザーの研究テーマ
+            strategy_text: 調査戦略テキスト
+            data: 収集したデータ
+
+        Returns:
+            str: 視覚化プロンプト
+        """
+        return f'''あなたは優秀なデータ分析者です。
+「{user_prompt}」に関する調査データから、視覚的な情報を作成してください。
+
+調査戦略:
+{strategy_text}
+
+収集したデータ:
+{data[:10000]}  # データが長い場合は一部を使用
+
+以下の点に注意してください:
+1. 収集したデータから数値データを見つけ、グラフ化できるものを特定してください
+2. 表形式のデータがあれば、それをグラフに変換することを検討してください
+3. 時系列データ、比較データ、割合データなど、グラフ化に適したデータを探してください
+4. generate_graphツールを使用して、適切なグラフ（棒グラフ、折れ線グラフ、円グラフなど）を作成してください
+5. グラフのタイトル、軸ラベル、凡例などを適切に設定してください
+6. 作成したグラフは最終レポートで使用されます
+
+データを分析し、グラフ化できるデータがあれば、generate_graphツールを使用してグラフを作成してください。
+グラフ化できるデータがない場合は、その旨を説明してください。
+'''
+
     def _initialize_conversation(self, user_prompt: str, pre_research_data: str):
         """会話の初期化"""
         self.conversation['A'] = [
@@ -245,12 +472,17 @@ class ResearchManager:
 「{user_prompt}」について、コンテキストがわからない用語も含めてキーワードに分割した上で、以下の点を明らかにするための情報を収集してください：
 
 1. 主要な概念や用語の定義
-2. 関連する用語や関連するコンテキスト
-3. 用語に関連する最新の動向や傾向や話題
-4. 用語に関連する最新の研究や、最新のニュース
-5. 用語に関連する事例
+2. 最新のニュースや画像
+3. 関連する用語や関連するコンテキスト
+4. 用語に関連する最新の動向や傾向や話題
+5. 用語に関連する最新の研究
+6. データポイント
+7. 用語に関連する事例
 
-Web検索とコンテンツ取得を使用して、これらの情報を収集してください。
+Web検索とコンテンツ取得と画像取得ツールを使用して、これらの情報を収集してください。
+数値データからグラフ画像を作成することもできるので、生の数値データが取れそうななども確認してください。
+数値データが取得できた場合は、グラフ生成ツールで作成した画像を使用して視覚的に表現することも検討してください。
+必ず1つ以上の画像を取得するようにしてください。
 '''
 
     def _create_qualification_prompt(
@@ -278,6 +510,7 @@ AI さんはあなたの思考の枠を外して広い視野を提供してく�
 * 調査対象に関わるだろう人の観点を複数入れてください。例えば料理であれば、調理器具をつくる人、食材を運ぶ人、料理を作る人、料理を運ぶ人、食べる人、口コミを書く人などです。与えられたお題に反しない限り様々な人に思いを巡らせてください。
 * 会話を始める前に、自分がどのように考えたのか、を述べてから結論を述べてください。
 * さまざまな観点から内容をブラッシュアップしてください。
+* 事前調査に基づき、画像取得や作成したグラフ画像などの視覚的な情報をできるだけ活用することを検討してください。
 
 また、発言する際は最初に必ず x 回目の発言です、と言ってください。発言回数は自分の発言回数であり、相手の発言はカウントしてはいけません。
 '''
@@ -294,6 +527,12 @@ AI さんはあなたの思考の枠を外して広い視野を提供してく�
 どのように調査を進めるかの方針をまとめた会話を渡します。
 調査の方針をまとめてください。
 ただし出力する内容は調査の方針だけで、会話を続ける必要はありません。
+
+調査の方針には、以下の点も含めてください：
+1. どのような情報（テキスト・画像・生データ）を収集するか
+2. どのようなツール（Web検索、コンテンツ取得、画像検索と画像取得、グラフ画像作成など）を使用するか
+3. 収集した情報をどのように整理・分析するか。必要に応じて、あるいはグラフ画像を作成が有効か
+4. 最終的なレポートにどのような視覚的要素（画像取得ツールでダウンロードした画像、グラフ画像作成ツールで生成した画像）を含めるか
 '''
             }
         ]
