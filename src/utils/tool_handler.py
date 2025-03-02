@@ -18,7 +18,8 @@ from ..utils.exceptions import ToolError
 from ..models.bedrock import BedrockModel
 from ..config.settings import MODEL_CONFIG, PRIMARY_MODEL, PROMPT_CONFIG, IMAGE_CONFIG, GRAPH_CONFIG
 import io
-import fitz  # PyMuPDF for PDF processing
+import fitz as pymupdf
+from fitz import open as fitz_open
 import tempfile
 
 
@@ -150,7 +151,7 @@ class ToolHandler:
                 temp_path = temp_file.name
             
             # PyMuPDFでPDFを開く
-            pdf_document = fitz.open(temp_path)
+            pdf_document = pymupdf.open(temp_path)
             self.logger.log(f"PDFを開きました: {pdf_document.page_count}ページ")
             
             # 各ページの画像を抽出
