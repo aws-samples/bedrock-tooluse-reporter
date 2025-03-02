@@ -12,7 +12,7 @@ import uuid
 import matplotlib.pyplot as plt
 import matplotlib
 matplotlib.use('Agg')  # Use non-interactive backend
-import japanize_matplotlib 
+import matplotlib_fontja
 import numpy as np
 from ..utils.exceptions import ToolError
 from ..models.bedrock import BedrockModel
