@@ -27,10 +27,10 @@ SUMMARY_CONVERSATION_TURNS = 3  # サマリーモードでの会話の最大タ�
 
 # 調査の最大回数
 MAX_PRE_RESEARCH_SEARCHES = 40  # 標準モードでの事前調査の最大検索回数
-SUMMARY_PRE_RESEARCH_SEARCHES = 3  # サマリーモードでの事前調査の最大検索回数
+SUMMARY_PRE_RESEARCH_SEARCHES = 10  # サマリーモードでの事前調査の最大検索回数
 
 MAX_RESEARCH_SEARCHES = 40  # 標準モードでの調査の最大検索回数
-SUMMARY_RESEARCH_SEARCHES = 10  # サマリーモードでの調査の最大検索回数
+SUMMARY_RESEARCH_SEARCHES = 5  # サマリーモードでの調査の最大検索回数
 
 # LLM接続設定
 LLM_CONNECTION = {
@@ -172,6 +172,28 @@ TOOL_CONFIG = {
         },
         {
             'toolSpec': {
+                'name': 'render_mermaid',
+                'description': 'Mermaid形式のコードからダイアグラムや図表を生成する',
+                'inputSchema': {
+                    'json': {
+                        'type': 'object',
+                        'properties': {
+                            'mermaid_code': {
+                                'type': 'string',
+                                'description': 'Mermaid形式のテキストを渡すと、Mermaid形式の文字列を渡すと図を作成する。Mermaid形式には全て対応しており、Flowchat,Sequence Diagram,Class Diagram, State Diagram, Gantt, Pie chart, Quadrant Chart, Git diagram, Mindmaps, ZenUML, Sankky, XY Chart, Block Diagram, Packet, Kanban, Architecture等が作成できます。',
+                            },
+                            'title': {
+                                'type': 'string',
+                                'description': '図表のタイトル（オプション）',
+                            }
+                        },
+                        'required': ['mermaid_code'],
+                    }
+                },
+            }
+        },
+        {
+            'toolSpec': {
                 'name': 'is_finished',
                 'description': 'ツールの利用が完了し、次のステップに進む関数',
                 'inputSchema': {
@@ -230,6 +252,12 @@ IMAGE_CONFIG = {
     'max_images': 10,  # 1回の検索で取得する最大画像数
     'max_size': 5 * 1024 * 1024,  # 画像の最大サイズ（5MB）
     'allowed_formats': ['jpg', 'jpeg', 'png', 'gif', 'webp'],  # 許可する画像形式
+}
+
+# PDF設定
+PDF_CONFIG = {
+    'max_size': 50 * 1024 * 1024,  # PDFの最大サイズ（50MB）
+    'bedrock_max_size': 4.3 * 1024 * 1024,  # Bedrock APIの最大サイズ（up to 4.5MB in rawdata）
 }
 
 # グラフ設定

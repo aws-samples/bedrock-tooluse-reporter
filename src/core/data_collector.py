@@ -229,7 +229,8 @@ class DataCollector:
 2. get_content: URLからコンテンツを取得する
 3. image_search: 関連する画像を検索して取得して保存する
 4. generate_graph: 数値データからグラフ画像（折れ線グラフ・棒グラフ・円グラフ）を生成する
-5. is_finished: 情報収集を完了する
+5. render_mermaid: Mermaid形式の文字列を渡すと図を作成する。Mermaid形式には全て対応しており、Flowchat,Sequence Diagram,Class Diagram, State Diagram, Gantt, Pie chart, Quadrant Chart, Git diagram, Mindmaps, ZenUML, Sankky, XY Chart, Block Diagram, Packet, Kanban, Architecture等が作成できます。
+6. is_finished: 情報収集を完了する
 
 特に、以下の点に注意してください：
 - 必ず1つ以上の画像を取得するために、image_searchツールを使用して関連画像を検索・保存してください

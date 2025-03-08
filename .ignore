@@ -13,6 +13,9 @@ venv
 .venv
 dist
 build
+reports
+logs
+test.log
 
 # File extensions to ignore
 *.pyc
@@ -21,8 +24,6 @@ build
 *.bak
 *.swp
 *.html
-*.txt
-*.md
 
 # Ignore files starting with a dot
 .*
