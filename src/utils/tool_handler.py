@@ -16,11 +16,19 @@ import matplotlib_fontja
 import numpy as np
 from ..utils.exceptions import ToolError
 from ..models.bedrock import BedrockModel
-from ..config.settings import MODEL_CONFIG, PRIMARY_MODEL, PROMPT_CONFIG, IMAGE_CONFIG, GRAPH_CONFIG
+from ..config.settings import MODEL_CONFIG, PRIMARY_MODEL, PROMPT_CONFIG, IMAGE_CONFIG, GRAPH_CONFIG,PDF_CONFIG
 import io
 import fitz as pymupdf
 from fitz import open as fitz_open
 import tempfile
+import re
+import subprocess
+import base64
+from urllib.request import urlopen, Request
+import asyncio
+from PIL import Image
+import io
+from mermaid_cli import render_mermaid
 
 
 class ToolHandler:
@@ -30,6 +38,16 @@ class ToolHandler:
     このクラスは、Web検索やコンテンツ取得などの外部ツールの操作を処理し、
     AIモデルからのツール使用リクエストを解釈します。
     """
+
+    """
+    http request時のUser-AgentなどHttp Headerを指定
+    """
+    def _get_http_headers(self):
+        obj =  {
+            'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36'
+        }
+        return obj
+
 
     def __init__(self,logger,base_filename):
         """
@@ -49,6 +67,8 @@ class ToolHandler:
         self.logger=logger
         # 現在のレポートの画像ディレクトリ
         self.current_image_dir = (f"{base_filename}_images")
+        self.max_pdf_size = PDF_CONFIG['max_size']
+        self.max_bedrock_converse_limit = PDF_CONFIG['bedrock_max_size']
 
     def _load_api_key(self) -> str:
         """
@@ -95,7 +115,7 @@ class ToolHandler:
             self.logger.log(f"PDFファイルをダウンロード: {url}")
 
             # タイムアウト設定でリクエスト実行
-            response = requests.get(url, timeout=self.timeout, stream=True)
+            response = requests.get(url, timeout=self.timeout, stream=True,headers=self._get_http_headers())
             
             # HTTPステータスコードのチェック
             if response.status_code >= 300:  # 300番台以上は全てエラーとして扱う
@@ -105,8 +125,9 @@ class ToolHandler:
             content_length = int(response.headers.get('Content-Length', 0))
             self.logger.log(f"ファイルサイズ: {content_length} bytes")
             
-            # ファイルサイズが500MB以上の場合はダウンロードしない
-            if content_length >= 500 * 1024 * 1024:  # 500MB in bytes
+            # ファイルサイズが50MB以上の場合はダウンロードしない
+            if content_length >= self.max_pdf_size:  # 500MB in bytes
+                self.logger.log(f"ファイルサイズ: {content_length} bytes / {self.max_pdf_size}を越えています")
                 return None, content_length
                 
             # PDFファイルをダウンロード
@@ -128,79 +149,112 @@ class ToolHandler:
             # その他のエラー
             return None, 0
 
-    def _extract_images_from_pdf(self, pdf_content: bytes) -> List[str]:
+    def _extract_content_from_pdf(self, pdf_content: bytes) -> tuple[List[str], str, str]:
         """
-        PDFファイルから画像を抽出して保存
+        PDFファイルから画像とテキストを抽出して保存
 
         Args:
             pdf_content: PDFファイルのバイナリコンテンツ
 
         Returns:
-            List[str]: 保存した画像ファイルのパスのリスト
+            tuple[List[str], str, str]: 保存した画像ファイルのパスのリスト、PDFのタイトル、抽出したテキスト
         """
         if self.current_image_dir is None:
             self.logger.log("画像ディレクトリが設定されていません")
-            return []
+            return [], "", ""
 
         saved_images = []
-        
+        pdf_title = ""
+        extracted_text = ""
+
         try:
             # 一時ファイルにPDFを保存
             with tempfile.NamedTemporaryFile(suffix='.pdf', delete=False) as temp_file:
                 temp_file.write(pdf_content)
                 temp_path = temp_file.name
-            
+
             # PyMuPDFでPDFを開く
             pdf_document = pymupdf.open(temp_path)
             self.logger.log(f"PDFを開きました: {pdf_document.page_count}ページ")
-            
-            # 各ページの画像を抽出
+
+            # PDFのメタデータからタイトルを取得
+            metadata = pdf_document.metadata
+            if metadata and 'title' in metadata and metadata['title']:
+                pdf_title = metadata['title']
+            else:
+                # タイトルがない場合は最初のページからテキストを抽出して推測
+                first_page = pdf_document[0]
+                text = first_page.get_text()
+                # 最初の行をタイトルとして使用（最大100文字）
+                if text:
+                    lines = text.strip().split('\n')
+                    if lines:
+                        pdf_title = lines[0][:100]
+
+            self.logger.log(f"PDFタイトル: {pdf_title}")
+
+            # 各ページのテキストを抽出
             for page_num, page in enumerate(pdf_document):
+                page_text = page.get_text()
+                extracted_text += f"\n--- ページ {page_num + 1} ---\n{page_text}"
+
+                # 各ページの画像を抽出
                 image_list = page.get_images(full=True)
-                
+
                 for img_index, img in enumerate(image_list):
                     try:
                         xref = img[0]  # 画像の参照番号
                         base_image = pdf_document.extract_image(xref)
                         image_bytes = base_image["image"]
                         image_ext = base_image["ext"]
-                        
+
                         # 許可された拡張子かチェック
                         if image_ext.lower() not in [f.lstrip('.').lower() for f in IMAGE_CONFIG['allowed_formats']]:
                             continue
-                            
+
                         # 画像サイズのチェック
                         if len(image_bytes) > IMAGE_CONFIG['max_size']:
                             continue
-                            
+                        
+                        # 画像の幅と高さを取得
+                        image = Image.open(io.BytesIO(image_bytes))
+                        width, height = image.size
+
+                        # 500x500より小さい画像はスキップ
+                        if width <= 500 or height <= 500:
+                            #self.logger.log(f"画像サイズが小さいためスキップ: {width}x{height}")
+                            continue
+
                         # 画像を保存
                         filename = f"{uuid.uuid4().hex}.{image_ext}"
                         filepath = os.path.join(self.current_image_dir, filename)
-                        
+
                         with open(filepath, 'wb') as img_file:
                             img_file.write(image_bytes)
-                            
-                        self.logger.log(f"PDFから画像を抽出して保存しました: {filepath}")
+
+                        self.logger.log(f"PDFから画像を抽出して保存しました: {filepath} (サイズ: {width}x{height})")
                         saved_images.append(filepath)
                     except Exception as e:
                         self.logger.log(f"画像抽出エラー (ページ {page_num+1}, 画像 {img_index+1}): {str(e)}")
-            
+
             # 一時ファイルを削除
             pdf_document.close()
             os.unlink(temp_path)
-            
+
             self.logger.log(f"PDFから合計 {len(saved_images)} 個の画像を抽出しました")
-            return saved_images
-            
+            self.logger.log(f"PDFから合計 {len(extracted_text)} 文字のテキストを抽出しました")
+
+            return saved_images, pdf_title, extracted_text
+
         except Exception as e:
-            self.logger.log(f"PDF画像抽出エラー: {str(e)}")
+            self.logger.log(f"PDF抽出エラー: {str(e)}")
             # 一時ファイルが残っていれば削除を試みる
             try:
                 if 'temp_path' in locals():
                     os.unlink(temp_path)
             except:
                 pass
-            return []
+            return [], "", ""
 
     def get_content(self, url: str) -> Tuple[str, str]:
         """
@@ -218,29 +272,23 @@ class ToolHandler:
             Tuple[str, str]: 取得したコンテンツとページタイトル。エラー時は空文字列のタプル
         """
         try:
+
             # タイムアウト設定でリクエスト実行
-            response = requests.get(url, timeout=self.timeout, stream=True)
+            response = requests.get(url, timeout=self.timeout, stream=True,headers=self._get_http_headers())
 
             # HTTPステータスコードのチェック
             if response.status_code >= 300:  # 300番台以上は全てエラーとして扱う
+                self.logger.log(f"コンテンツ取得エラー: ステータスコード {response.status_code}")
                 return "", ""
 
             # コンテンツタイプのチェック
             content_type = response.headers.get('Content-Type', '').lower()
+            self.logger.log(f"コンテンツタイプ: {content_type}")
 
             # PDFファイルの場合
             if 'pdf' in content_type or url.lower().endswith('.pdf'):
                 # PDFファイルをダウンロード
                 pdf_content, file_size = self._download_pdf(url)
-                
-                # ファイルサイズが500MB以上の場合はダウンロードしない
-                if pdf_content is None and file_size >= 500 * 1024 * 1024:
-                    self.logger.log(f"PDFファイルサイズ制限超過: {url}")
-                    return (
-                        f"[このPDFファイルは{file_size / (1024 * 1024):.1f}MBであり、サイズ制限（500MB）を超えています。"
-                        f"ファイルを手動でダウンロードして確認してください。]",
-                        "大きなPDFファイル",
-                    )
                 
                 # ダウンロードエラーの場合
                 if pdf_content is None:
@@ -251,22 +299,40 @@ class ToolHandler:
                         "PDFダウンロードエラー",
                     )
                 
+                extracted_text = ""
+                
                 # PDFから画像を抽出して保存
-                extracted_images = self._extract_images_from_pdf(pdf_content)
+                extracted_images,pdf_title,extracted_text = self._extract_content_from_pdf(pdf_content)
+                self.logger.log(f"PDFからタイトルを抽出: {pdf_title}")
                 image_info = ""
                 if extracted_images:
                     image_info = f"\n\n[PDFから {len(extracted_images)} 個の画像を抽出しました。これらの画像はレポートで参照できます。]"
-                    
-                # PDFファイルをBedrockにアップロードしてテキストを抽出
-                bedrock_model = BedrockModel(self.logger)
-                extracted_text = bedrock_model.process_pdf(pdf_content, MODEL_CONFIG[PRIMARY_MODEL])
-                self.logger.log(f"PDF / Bedrock extracted_text: {extracted_text}")
-                
+
+                if extracted_text:
+                    self.logger.log(f"PDFからテキストを抽出: {len(extracted_text)} 文字")
+
                 # ファイル名をタイトルとして使用
-                title = url.split('/')[-1]
+                title = pdf_title
                 if not title:
                     title = "PDFドキュメント"
-                    
+
+                if pdf_content is None:
+                    self.logger.log(f"PDF fileが読み込めませんでした")
+                
+                elif file_size >= self.max_bedrock_converse_limit:
+                    self.logger.log(f"PDFファイルサイズ bedrock converse API 制限超過: {url}")
+                    self.logger.log(f"[このPDFファイルは{file_size / (1024 * 1024):.1f}MBであり、サイズ制限（{self.max_bedrock_converse_limit / (1024 * 1024):.1f}MB）を超えています。")
+   
+                else:
+                    try:
+                        self.logger.log(f"[PDFファイルは{file_size / (1024 * 1024):.1f}MB <-> サイズ制限（{self.max_bedrock_converse_limit / (1024 * 1024):.1f}MB）")
+                        # PDFファイルをBedrockにアップロードしてテキストを抽出
+                        bedrock_model = BedrockModel(self.logger)
+                        extracted_text = bedrock_model.process_pdf(pdf_content, MODEL_CONFIG[PRIMARY_MODEL])
+                        self.logger.log(f"PDF / Bedrock extracted_text: {extracted_text}")
+                    except Exception as e:
+                        self.logger.log(f"PDFファイルのBedrock処理エラー: {str(e)}")
+                
                 return extracted_text + image_info, title
 
             # その他のバイナリコンテンツの場合は処理をスキップ
@@ -336,6 +402,8 @@ class ToolHandler:
                 params=params,
                 timeout=self.timeout,
             )
+            self.logger.log(f"Web検索API: {response.url}")
+            self.logger.log(f"Web検索API: {response.status_code}")
 
             # HTTPステータスコードのチェック
             if response.status_code >= 300:  # 300番台以上は全てエラーとして扱う
@@ -510,7 +578,7 @@ class ToolHandler:
         """
         try:
             # タイムアウト設定でリクエスト実行
-            response = requests.get(url, timeout=self.timeout, stream=True)
+            response = requests.get(url, timeout=self.timeout, stream=True,headers=self._get_http_headers())
             
             # HTTPステータスコードのチェック
             if response.status_code >= 300:
@@ -799,6 +867,99 @@ class ToolHandler:
             
             # X軸のラベルを設定
             plt.xticks(range(len(data)), labels)
+
+    def render_mermaid(self, mermaid_code: str, title: str = None) -> str:
+        """
+        Mermaid図をレンダリングして画像として保存
+
+        Args:
+            mermaid_code: Mermaid形式の図表コード
+            title: 図表のタイトル（オプション）
+
+        Returns:
+            str: 生成した図表のパスとメタデータのJSON文字列
+        """
+        if self.current_image_dir is None:
+            return json.dumps({"error": "画像ディレクトリが設定されていません"}, ensure_ascii=False)
+            
+        try:
+            self.logger.log(f"Mermaid図をレンダリング: {title or 'タイトルなし'}")
+            
+            # 出力ファイル名を生成
+            filename = f"mermaid_{uuid.uuid4().hex}.png"
+            output_path = os.path.join(self.current_image_dir, filename)
+            
+            # mermaid_cliライブラリを使用してレンダリング
+            try:
+
+                
+                # 非同期関数を実行するためのイベントループを取得
+                loop = asyncio.get_event_loop()
+                
+                # render_mermaid関数を実行
+                _, _, image_data = loop.run_until_complete(render_mermaid(
+                    mermaid_code,
+                    output_format="png",
+                    background_color="white",
+                    mermaid_config={"theme": "forest"}
+                ))
+                
+                # 画像データをファイルに保存
+                with open(output_path, 'wb') as f:
+                    f.write(image_data)
+                
+                # 相対パスに変換
+                rel_path = os.path.relpath(output_path, start=os.path.dirname(self.current_image_dir))
+                
+                self.logger.log(f"Mermaid図を生成しました: {output_path}")
+                
+                return json.dumps({
+                    "mermaid_path": rel_path,
+                    "title": title or "Mermaid Diagram",
+                    "type": "mermaid",
+                }, ensure_ascii=False)
+                
+            except ImportError:
+                self.logger.log("mermaid_cliライブラリがインストールされていません。")
+                
+        except Exception as e:
+            self.logger.log(f"Mermaid図のレンダリングエラー: {str(e)}")
+            return json.dumps({"error": f"Mermaid図のレンダリングエラー: {str(e)}"}, ensure_ascii=False)
+
+    def extract_mermaid_diagrams(self, text: str) -> List[Tuple[str, str]]:
+        """
+        テキストからMermaid図を抽出
+
+        Args:
+            text: 抽出元のテキスト
+
+        Returns:
+            List[Tuple[str, str]]: (図のタイトル, Mermaidコード) のタプルのリスト
+        """
+        diagrams = []
+        
+        # Mermaidコードブロックを検索
+        # ```mermaid ... ``` 形式
+        pattern1 = r'```mermaid\s+(.*?)```'
+        matches1 = re.finditer(pattern1, text, re.DOTALL)
+        for match in matches1:
+            mermaid_code = match.group(1).strip()
+            # タイトルを抽出（最初の行がタイトルっぽい場合）
+            title_match = re.search(r'^(graph|flowchart|sequenceDiagram|classDiagram|stateDiagram|erDiagram|gantt|pie|journey)\s+(.+?)$', mermaid_code, re.MULTILINE)
+            title = title_match.group(2) if title_match else "Mermaid Diagram"
+            diagrams.append((title, mermaid_code))
+        
+        # <mermaid> ... </mermaid> 形式
+        pattern2 = r'<mermaid>\s*(.*?)\s*</mermaid>'
+        matches2 = re.finditer(pattern2, text, re.DOTALL)
+        for match in matches2:
+            mermaid_code = match.group(1).strip()
+            # タイトルを抽出（最初の行がタイトルっぽい場合）
+            title_match = re.search(r'^(graph|flowchart|sequenceDiagram|classDiagram|stateDiagram|erDiagram|gantt|pie|journey)\s+(.+?)$', mermaid_code, re.MULTILINE)
+            title = title_match.group(2) if title_match else "Mermaid Diagram"
+            diagrams.append((title, mermaid_code))
+        
+        return diagrams
 
     def process_tool_response(self, model_response: Dict) -> Optional[Dict]:
         """

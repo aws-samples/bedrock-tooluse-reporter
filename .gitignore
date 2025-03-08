@@ -2,3 +2,8 @@
 __pycache__/
 logs/*
 reports/*
+.DS_Store
+/trush/*
+/test.log/*
+/python/*
+

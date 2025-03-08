@@ -113,6 +113,9 @@ class BedrockModel:
                         )
 
                     wait_time = self._exponential_backoff(retry_count)
+                    self.logger.log(
+                        f"Bedrock API error: {str(e)}. Retrying in {wait_time} seconds..."
+                    )
                     time.sleep(wait_time)
                     retry_count += 1
                 else:

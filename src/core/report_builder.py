@@ -77,10 +77,10 @@ class ReportBuilder:
             
             # 視覚化データがない場合は空の辞書を使用
             if visualization_data is None:
-                visualization_data = {'graphs': [], 'tables': []}
+                visualization_data = {'graphs': [], 'tables': [], 'mermaid_diagrams': [], 'images_with_context': []}
                 
             # 視覚化データの情報をログに出力
-            self.logger.log(f"視覚化データ: グラフ {len(visualization_data['graphs'])} 個, 表 {len(visualization_data['tables'])} 個")
+            self.logger.log(f"視覚化データ: グラフ {len(visualization_data.get('graphs', []))} 個, 表 {len(visualization_data.get('tables', []))} 個, Mermaid図 {len(visualization_data.get('mermaid_diagrams', []))} 個, 文脈付き画像 {len(visualization_data.get('images_with_context', []))} 個")
             
             final_messages = self._create_final_messages(research_text, source_manager, mode)
             report_prompt = self._create_report_prompt(user_prompt, strategy_text, mode, visualization_data)
@@ -363,11 +363,38 @@ class ReportBuilder:
         
         # 視覚化データの情報を追加
         visualization_info = ""
+        
+        # グラフ情報
         if visualization_data and visualization_data.get('graphs'):
             visualization_info += "\n\n以下のグラフ画像が利用可能です。適切な箇所でこれらを参照してください：\n"
             for i, graph in enumerate(visualization_data['graphs']):
                 if 'graph_path' in graph:
-                    visualization_info += f"- グラフ{i+1}: {graph['graph_path']} (タイトル: {graph.get('title', '不明')}, タイプ: {graph.get('type', '不明')})\n"
+                    purpose = graph.get('purpose', '不明')
+                    purpose_info = f" (目的: {purpose})" if purpose else ""
+                    visualization_info += f"- グラフ{i+1}: {graph['graph_path']} (タイトル: {graph.get('title', '不明')}, タイプ: {graph.get('type', '不明')}{purpose_info})\n"
+        
+        # Mermaid図の情報
+        if visualization_data and visualization_data.get('mermaid_diagrams'):
+            visualization_info += "\n\n以下のMermaid図が利用可能です。適切な箇所でこれらを参照してください：\n"
+            for i, diagram in enumerate(visualization_data['mermaid_diagrams']):
+                if 'mermaid_path' in diagram:
+                    purpose = diagram.get('purpose', '不明')
+                    purpose_info = f" (目的: {purpose})" if purpose else ""
+                    visualization_info += f"- Mermaid図{i+1}: {diagram['mermaid_path']} (タイトル: {diagram.get('title', '不明')}{purpose_info})\n"
+        
+        # 文脈付き画像の情報
+        if visualization_data and visualization_data.get('images_with_context'):
+            visualization_info += "\n\n以下の画像には文脈情報が付加されています。適切な箇所でこれらを参照してください：\n"
+            for i, img_ctx in enumerate(visualization_data['images_with_context']):
+                if 'path' in img_ctx:
+                    caption = img_ctx.get('caption', '説明なし')
+                    visualization_info += f"- 画像{i+1}: {img_ctx['path']} (説明: {caption})\n"
+                    # 文脈情報の一部も提供（長すぎる場合は省略）
+                    context = img_ctx.get('context', '')
+                    if context and len(context) > 100:
+                        context = context[:100] + "..."
+                    if context:
+                        visualization_info += f"  文脈: {context}\n"
         
         return f'''あなたは優秀なリサーチャーです。
 あなたは「{user_prompt}」 という調査依頼を受けとっています。
@@ -388,6 +415,8 @@ class ReportBuilder:
 * 画像データを扱う場合は、ダウンロード済みファイルを読み込み視覚的に表現することを検討してください
 * 画像やグラフを使用する場合は、本文と適切に配置し、レイアウトに配慮してください
 * 存在しない参考文献を参照しないでください
+* 画像やグラフを使用する際は、その意味や目的を明確に説明し、本文との関連性を示してください
+* 文脈付き画像を使用する場合は、提供されている文脈情報を活用して、画像の意味や重要性を説明してください
 {visualization_info}
 '''
 
@@ -522,6 +551,33 @@ class ReportBuilder:
         /* PDF specific styles */
         @page {
             margin: 1cm;
+        }
+        /* Enhanced visualization styles */
+        .visualization-container {
+            margin: 30px 0;
+            padding: 15px;
+            background-color: #f9f9f9;
+            border-radius: 5px;
+            border-left: 4px solid #3498db;
+        }
+        .visualization-title {
+            font-weight: bold;
+            color: #2c3e50;
+            margin-bottom: 10px;
+        }
+        .visualization-description {
+            font-style: italic;
+            color: #555;
+            margin-bottom: 15px;
+        }
+        .graph-container {
+            text-align: center;
+        }
+        .mermaid-container {
+            text-align: center;
+            background-color: white;
+            padding: 10px;
+            border-radius: 4px;
         }
         """
 
