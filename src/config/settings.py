@@ -27,10 +27,10 @@ SUMMARY_CONVERSATION_TURNS = 3  # サマリーモードでの会話の最大タ�
 
 # 調査の最大回数
 MAX_PRE_RESEARCH_SEARCHES = 40  # 標準モードでの事前調査の最大検索回数
-SUMMARY_PRE_RESEARCH_SEARCHES = 10  # サマリーモードでの事前調査の最大検索回数
+SUMMARY_PRE_RESEARCH_SEARCHES = 3  # サマリーモードでの事前調査の最大検索回数
 
 MAX_RESEARCH_SEARCHES = 40  # 標準モードでの調査の最大検索回数
-SUMMARY_RESEARCH_SEARCHES = 5  # サマリーモードでの調査の最大検索回数
+SUMMARY_RESEARCH_SEARCHES = 10  # サマリーモードでの調査の最大検索回数
 
 # LLM接続設定
 LLM_CONNECTION = {
