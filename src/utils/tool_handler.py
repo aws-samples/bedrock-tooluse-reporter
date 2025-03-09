@@ -11,12 +11,20 @@ import os
 import uuid
 import matplotlib.pyplot as plt
 import matplotlib
+
 matplotlib.use('Agg')  # Use non-interactive backend
 import matplotlib_fontja
 import numpy as np
 from ..utils.exceptions import ToolError
 from ..models.bedrock import BedrockModel
-from ..config.settings import MODEL_CONFIG, PRIMARY_MODEL, PROMPT_CONFIG, IMAGE_CONFIG, GRAPH_CONFIG,PDF_CONFIG
+from ..config.settings import (
+    MODEL_CONFIG,
+    PRIMARY_MODEL,
+    PROMPT_CONFIG,
+    IMAGE_CONFIG,
+    GRAPH_CONFIG,
+    PDF_CONFIG,
+)
 import io
 import fitz as pymupdf
 from fitz import open as fitz_open
@@ -42,14 +50,14 @@ class ToolHandler:
     """
     http request時のUser-AgentなどHttp Headerを指定
     """
+
     def _get_http_headers(self):
-        obj =  {
+        obj = {
             'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36'
         }
         return obj
 
-
-    def __init__(self,logger,base_filename):
+    def __init__(self, logger, base_filename):
         """
         ツールハンドラの初期化
 
@@ -64,9 +72,9 @@ class ToolHandler:
         }
         # タイムアウト設定（接続は5秒、読み込みは10秒）
         self.timeout = (5, 10)
-        self.logger=logger
+        self.logger = logger
         # 現在のレポートの画像ディレクトリ
-        self.current_image_dir = (f"{base_filename}_images")
+        self.current_image_dir = f"{base_filename}_images"
         self.max_pdf_size = PDF_CONFIG['max_size']
         self.max_bedrock_converse_limit = PDF_CONFIG['bedrock_max_size']
 
@@ -115,27 +123,31 @@ class ToolHandler:
             self.logger.log(f"PDFファイルをダウンロード: {url}")
 
             # タイムアウト設定でリクエスト実行
-            response = requests.get(url, timeout=self.timeout, stream=True,headers=self._get_http_headers())
-            
+            response = requests.get(
+                url, timeout=self.timeout, stream=True, headers=self._get_http_headers()
+            )
+
             # HTTPステータスコードのチェック
             if response.status_code >= 300:  # 300番台以上は全てエラーとして扱う
                 return None, 0
-                
+
             # Content-Lengthヘッダーからファイルサイズを取得
             content_length = int(response.headers.get('Content-Length', 0))
             self.logger.log(f"ファイルサイズ: {content_length} bytes")
-            
+
             # ファイルサイズが50MB以上の場合はダウンロードしない
             if content_length >= self.max_pdf_size:  # 500MB in bytes
-                self.logger.log(f"ファイルサイズ: {content_length} bytes / {self.max_pdf_size}を越えています")
+                self.logger.log(
+                    f"ファイルサイズ: {content_length} bytes / {self.max_pdf_size}を越えています"
+                )
                 return None, content_length
-                
+
             # PDFファイルをダウンロード
             pdf_content = response.content
             self.logger.log(f"PDFファイルダウンロード完了: {len(pdf_content)} bytes")
-            
+
             return pdf_content, len(pdf_content)
-            
+
         except requests.Timeout:
             self.logger.log(f"PDFファイルダウンロードエラー: タイムアウト")
             # タイムアウトエラー
@@ -149,7 +161,9 @@ class ToolHandler:
             # その他のエラー
             return None, 0
 
-    def _extract_content_from_pdf(self, pdf_content: bytes) -> tuple[List[str], str, str]:
+    def _extract_content_from_pdf(
+        self, pdf_content: bytes
+    ) -> tuple[List[str], str, str]:
         """
         PDFファイルから画像とテキストを抽出して保存
 
@@ -209,20 +223,23 @@ class ToolHandler:
                         image_ext = base_image["ext"]
 
                         # 許可された拡張子かチェック
-                        if image_ext.lower() not in [f.lstrip('.').lower() for f in IMAGE_CONFIG['allowed_formats']]:
+                        if image_ext.lower() not in [
+                            f.lstrip('.').lower()
+                            for f in IMAGE_CONFIG['allowed_formats']
+                        ]:
                             continue
 
                         # 画像サイズのチェック
                         if len(image_bytes) > IMAGE_CONFIG['max_size']:
                             continue
-                        
+
                         # 画像の幅と高さを取得
                         image = Image.open(io.BytesIO(image_bytes))
                         width, height = image.size
 
                         # 500x500より小さい画像はスキップ
                         if width <= 500 or height <= 500:
-                            #self.logger.log(f"画像サイズが小さいためスキップ: {width}x{height}")
+                            # self.logger.log(f"画像サイズが小さいためスキップ: {width}x{height}")
                             continue
 
                         # 画像を保存
@@ -232,17 +249,23 @@ class ToolHandler:
                         with open(filepath, 'wb') as img_file:
                             img_file.write(image_bytes)
 
-                        self.logger.log(f"PDFから画像を抽出して保存しました: {filepath} (サイズ: {width}x{height})")
+                        self.logger.log(
+                            f"PDFから画像を抽出して保存しました: {filepath} (サイズ: {width}x{height})"
+                        )
                         saved_images.append(filepath)
                     except Exception as e:
-                        self.logger.log(f"画像抽出エラー (ページ {page_num+1}, 画像 {img_index+1}): {str(e)}")
+                        self.logger.log(
+                            f"画像抽出エラー (ページ {page_num+1}, 画像 {img_index+1}): {str(e)}"
+                        )
 
             # 一時ファイルを削除
             pdf_document.close()
             os.unlink(temp_path)
 
             self.logger.log(f"PDFから合計 {len(saved_images)} 個の画像を抽出しました")
-            self.logger.log(f"PDFから合計 {len(extracted_text)} 文字のテキストを抽出しました")
+            self.logger.log(
+                f"PDFから合計 {len(extracted_text)} 文字のテキストを抽出しました"
+            )
 
             return saved_images, pdf_title, extracted_text
 
@@ -274,11 +297,15 @@ class ToolHandler:
         try:
 
             # タイムアウト設定でリクエスト実行
-            response = requests.get(url, timeout=self.timeout, stream=True,headers=self._get_http_headers())
+            response = requests.get(
+                url, timeout=self.timeout, stream=True, headers=self._get_http_headers()
+            )
 
             # HTTPステータスコードのチェック
             if response.status_code >= 300:  # 300番台以上は全てエラーとして扱う
-                self.logger.log(f"コンテンツ取得エラー: ステータスコード {response.status_code}")
+                self.logger.log(
+                    f"コンテンツ取得エラー: ステータスコード {response.status_code}"
+                )
                 return "", ""
 
             # コンテンツタイプのチェック
@@ -289,7 +316,7 @@ class ToolHandler:
             if 'pdf' in content_type or url.lower().endswith('.pdf'):
                 # PDFファイルをダウンロード
                 pdf_content, file_size = self._download_pdf(url)
-                
+
                 # ダウンロードエラーの場合
                 if pdf_content is None:
                     self.logger.log(f"PDFダウンロードエラー: {url}")
@@ -298,18 +325,22 @@ class ToolHandler:
                         f"ファイルを手動でダウンロードして確認してください。]",
                         "PDFダウンロードエラー",
                     )
-                
+
                 extracted_text = ""
-                
+
                 # PDFから画像を抽出して保存
-                extracted_images,pdf_title,extracted_text = self._extract_content_from_pdf(pdf_content)
+                extracted_images, pdf_title, extracted_text = (
+                    self._extract_content_from_pdf(pdf_content)
+                )
                 self.logger.log(f"PDFからタイトルを抽出: {pdf_title}")
                 image_info = ""
                 if extracted_images:
                     image_info = f"\n\n[PDFから {len(extracted_images)} 個の画像を抽出しました。これらの画像はレポートで参照できます。]"
 
                 if extracted_text:
-                    self.logger.log(f"PDFからテキストを抽出: {len(extracted_text)} 文字")
+                    self.logger.log(
+                        f"PDFからテキストを抽出: {len(extracted_text)} 文字"
+                    )
 
                 # ファイル名をタイトルとして使用
                 title = pdf_title
@@ -318,27 +349,36 @@ class ToolHandler:
 
                 if pdf_content is None:
                     self.logger.log(f"PDF fileが読み込めませんでした")
-                
+
                 elif file_size >= self.max_bedrock_converse_limit:
-                    self.logger.log(f"PDFファイルサイズ bedrock converse API 制限超過: {url}")
-                    self.logger.log(f"[このPDFファイルは{file_size / (1024 * 1024):.1f}MBであり、サイズ制限（{self.max_bedrock_converse_limit / (1024 * 1024):.1f}MB）を超えています。")
-   
+                    self.logger.log(
+                        f"PDFファイルサイズ bedrock converse API 制限超過: {url}"
+                    )
+                    self.logger.log(
+                        f"[このPDFファイルは{file_size / (1024 * 1024):.1f}MBであり、サイズ制限（{self.max_bedrock_converse_limit / (1024 * 1024):.1f}MB）を超えています。"
+                    )
+
                 else:
                     try:
-                        self.logger.log(f"[PDFファイルは{file_size / (1024 * 1024):.1f}MB <-> サイズ制限（{self.max_bedrock_converse_limit / (1024 * 1024):.1f}MB）")
+                        self.logger.log(
+                            f"[PDFファイルは{file_size / (1024 * 1024):.1f}MB <-> サイズ制限（{self.max_bedrock_converse_limit / (1024 * 1024):.1f}MB）"
+                        )
                         # PDFファイルをBedrockにアップロードしてテキストを抽出
                         bedrock_model = BedrockModel(self.logger)
-                        extracted_text = bedrock_model.process_pdf(pdf_content, MODEL_CONFIG[PRIMARY_MODEL])
-                        self.logger.log(f"PDF / Bedrock extracted_text: {extracted_text}")
+                        extracted_text = bedrock_model.process_pdf(
+                            pdf_content, MODEL_CONFIG[PRIMARY_MODEL]
+                        )
+                        self.logger.log(
+                            f"PDF / Bedrock extracted_text: {extracted_text}"
+                        )
                     except Exception as e:
                         self.logger.log(f"PDFファイルのBedrock処理エラー: {str(e)}")
-                
+
                 return extracted_text + image_info, title
 
             # その他のバイナリコンテンツの場合は処理をスキップ
             if (
-                'application/' in content_type
-                or 'image/' in content_type
+                'application/' in content_type or 'image/' in content_type
             ) and 'application/json' not in content_type:
                 return (
                     f"[このコンテンツは{content_type}ファイルであり、直接処理できません。"
@@ -449,22 +489,28 @@ class ToolHandler:
             str: 保存した画像のパスとメタデータのJSON文字列。エラー時は空文字列
         """
         if self.current_image_dir is None:
-            return json.dumps({"error": "画像ディレクトリが設定されていません"}, ensure_ascii=False)
+            return json.dumps(
+                {"error": "画像ディレクトリが設定されていません"}, ensure_ascii=False
+            )
 
         # 全角スペースを半角に変換
         query = query.replace('　', ' ')
-        
+
         # 最大画像数の設定
         if max_results is None:
             max_results = IMAGE_CONFIG['max_images']
         else:
             max_results = min(max_results, 10)  # 最大10枚に制限
-            
+
         saved_images = []
 
         try:
-            params = {"q": query, "offset": 0, "count": max_results * 2}  # 余裕を持って多めに取得
-            
+            params = {
+                "q": query,
+                "offset": 0,
+                "count": max_results * 2,
+            }  # 余裕を持って多めに取得
+
             # タイムアウト設定でリクエスト実行
             response = requests.get(
                 self.image_search_url,
@@ -475,7 +521,9 @@ class ToolHandler:
 
             # HTTPステータスコードのチェック
             if response.status_code >= 300:  # 300番台以上は全てエラーとして扱う
-                return json.dumps({"error": f"API error: {response.status_code}"}, ensure_ascii=False)
+                return json.dumps(
+                    {"error": f"API error: {response.status_code}"}, ensure_ascii=False
+                )
 
             data = response.json()
 
@@ -485,35 +533,39 @@ class ToolHandler:
                 for image in data['results']:
                     if count >= max_results:
                         break
-                    
+
                     # 画像URLの取得
                     property_dict = image.get('properties', {})
                     image_url = property_dict.get('url', '') if property_dict else None
                     if not image_url:
                         continue
-                        
+
                     # 画像の拡張子を取得
                     ext = self._get_image_extension(image_url, image.get('format', ''))
                     if not ext:
                         continue
-                        
+
                     # 画像をダウンロードして保存
                     image_path = self._download_and_save_image(image_url, ext)
-                    print("url:"+image_url)
+                    print("url:" + image_url)
                     if image_path:
                         # 相対パスに変換
-                        rel_path = os.path.relpath(image_path, start=os.path.dirname(self.current_image_dir))
-                        
-                        saved_images.append({
-                            "path": rel_path,
-                            "title": image.get('title', ''),
-                            "source_url": image.get('sourceUrl', ''),
-                            "width": image.get('width', 0),
-                            "height": image.get('height', 0),
-                            "format": image.get('format', ''),
-                        })
+                        rel_path = os.path.relpath(
+                            image_path, start=os.path.dirname(self.current_image_dir)
+                        )
+
+                        saved_images.append(
+                            {
+                                "path": rel_path,
+                                "title": image.get('title', ''),
+                                "source_url": image.get('sourceUrl', ''),
+                                "width": image.get('width', 0),
+                                "height": image.get('height', 0),
+                                "format": image.get('format', ''),
+                            }
+                        )
                         count += 1
-                        
+
             return json.dumps({"images": saved_images}, ensure_ascii=False)
 
         except requests.Timeout:
@@ -540,7 +592,7 @@ class ToolHandler:
         # URLから拡張子を取得
         path = url.split('?')[0]  # クエリパラメータを除去
         ext = os.path.splitext(path)[1].lower()
-        
+
         # 拡張子が取得できない場合はフォーマット文字列から推測
         if not ext and format_str:
             format_lower = format_str.lower()
@@ -552,17 +604,19 @@ class ToolHandler:
                 ext = '.gif'
             elif 'webp' in format_lower:
                 ext = '.webp'
-                
+
         # 拡張子から先頭のドットを除去して小文字に変換
         if ext.startswith('.'):
             ext = ext[1:]
         ext = ext.lower()
-        
+
         # 許可された拡張子かチェック
-        allowed_formats = [f.lstrip('.').lower() for f in IMAGE_CONFIG['allowed_formats']]
+        allowed_formats = [
+            f.lstrip('.').lower() for f in IMAGE_CONFIG['allowed_formats']
+        ]
         if ext in allowed_formats:
             return f".{ext}"
-            
+
         return ""
 
     def _download_and_save_image(self, url: str, ext: str) -> Optional[str]:
@@ -578,36 +632,38 @@ class ToolHandler:
         """
         try:
             # タイムアウト設定でリクエスト実行
-            response = requests.get(url, timeout=self.timeout, stream=True,headers=self._get_http_headers())
-            
+            response = requests.get(
+                url, timeout=self.timeout, stream=True, headers=self._get_http_headers()
+            )
+
             # HTTPステータスコードのチェック
             if response.status_code >= 300:
                 self.logger.log(f"画像ダウンロードエラー: HTTP {response.status_code}")
                 return None
-                
+
             # Content-Typeのチェック
             content_type = response.headers.get('Content-Type', '').lower()
             if not ('image/' in content_type):
                 self.logger.log(f"画像ではないコンテンツ: {content_type}")
                 return None
-                
+
             # ファイルサイズのチェック
             content_length = int(response.headers.get('Content-Length', 0))
             if content_length > IMAGE_CONFIG['max_size']:
                 self.logger.log(f"画像サイズ制限超過: {content_length} bytes")
                 return None
-                
+
             # ユニークなファイル名を生成
             filename = f"{uuid.uuid4().hex}{ext}"
             filepath = os.path.join(self.current_image_dir, filename)
-            
+
             # 画像を保存
             with open(filepath, 'wb') as f:
                 f.write(response.content)
-                
+
             self.logger.log(f"画像を保存しました: {filepath}")
             return filepath
-            
+
         except Exception as e:
             self.logger.log(f"画像ダウンロードエラー: {str(e)}")
             return None
@@ -642,85 +698,111 @@ class ToolHandler:
             str: 生成したグラフのパスとメタデータのJSON文字列
         """
         if self.current_image_dir is None:
-            return json.dumps({"error": "画像ディレクトリが設定されていません"}, ensure_ascii=False)
-            
+            return json.dumps(
+                {"error": "画像ディレクトリが設定されていません"}, ensure_ascii=False
+            )
+
         try:
             # データの検証
             if graph_type not in ['line', 'bar', 'pie', 'scatter', 'horizontal_bar']:
-                return json.dumps({"error": f"不正なグラフタイプ: {graph_type}"}, ensure_ascii=False)
-                
+                return json.dumps(
+                    {"error": f"不正なグラフタイプ: {graph_type}"}, ensure_ascii=False
+                )
+
             # 単一系列の場合
             if data is not None and labels is not None:
                 if len(data) != len(labels):
-                    return json.dumps({"error": "データとラベルの長さが一致しません"}, ensure_ascii=False)
-                    
+                    return json.dumps(
+                        {"error": "データとラベルの長さが一致しません"},
+                        ensure_ascii=False,
+                    )
+
             # 複数系列の場合
             if multi_data is not None:
                 if series_labels is not None and len(multi_data) != len(series_labels):
-                    return json.dumps({"error": "系列データと系列ラベルの長さが一致しません"}, ensure_ascii=False)
-                    
+                    return json.dumps(
+                        {"error": "系列データと系列ラベルの長さが一致しません"},
+                        ensure_ascii=False,
+                    )
+
                 if labels is not None:
                     for series in multi_data:
                         if len(series) != len(labels):
-                            return json.dumps({"error": "系列データとラベルの長さが一致しません"}, ensure_ascii=False)
-            
+                            return json.dumps(
+                                {"error": "系列データとラベルの長さが一致しません"},
+                                ensure_ascii=False,
+                            )
+
             # 色の設定
             if colors is None:
                 colors = GRAPH_CONFIG['default_colors']
-                
+
             # フィギュアの作成
             plt.figure(figsize=GRAPH_CONFIG['default_figsize'], dpi=GRAPH_CONFIG['dpi'])
-            
+
             # グラフの種類に応じて描画
             if graph_type == 'line':
                 self._create_line_chart(labels, data, multi_data, series_labels, colors)
             elif graph_type == 'bar':
                 self._create_bar_chart(labels, data, multi_data, series_labels, colors)
             elif graph_type == 'horizontal_bar':
-                self._create_horizontal_bar_chart(labels, data, multi_data, series_labels, colors)
+                self._create_horizontal_bar_chart(
+                    labels, data, multi_data, series_labels, colors
+                )
             elif graph_type == 'pie':
                 self._create_pie_chart(labels, data, colors)
             elif graph_type == 'scatter':
-                self._create_scatter_plot(labels, data, multi_data, series_labels, colors)
-                
+                self._create_scatter_plot(
+                    labels, data, multi_data, series_labels, colors
+                )
+
             # タイトルと軸ラベルの設定
             plt.title(title, fontsize=16)
             if x_label and graph_type != 'pie':
                 plt.xlabel(x_label, fontsize=12)
             if y_label and graph_type != 'pie':
                 plt.ylabel(y_label, fontsize=12)
-                
+
             # 凡例の設定（必要な場合）
-            if (multi_data is not None and series_labels is not None) or graph_type == 'pie':
+            if (
+                multi_data is not None and series_labels is not None
+            ) or graph_type == 'pie':
                 plt.legend(loc='best')
-                
+
             # グリッドの設定（円グラフ以外）
             if graph_type != 'pie':
                 plt.grid(True, linestyle='--', alpha=0.7)
-                
+
             # レイアウトの調整
             plt.tight_layout()
-            
+
             # ファイルの保存
             filename = f"graph_{uuid.uuid4().hex}.png"
             filepath = os.path.join(self.current_image_dir, filename)
             plt.savefig(filepath)
             plt.close()
-            
+
             # 相対パスに変換
-            rel_path = os.path.relpath(filepath, start=os.path.dirname(self.current_image_dir))
-            
+            rel_path = os.path.relpath(
+                filepath, start=os.path.dirname(self.current_image_dir)
+            )
+
             self.logger.log(f"グラフを生成しました: {filepath}")
-            
-            return json.dumps({
-                "graph_path": rel_path,
-                "title": title,
-                "type": graph_type,
-            }, ensure_ascii=False)
-            
+
+            return json.dumps(
+                {
+                    "graph_path": rel_path,
+                    "title": title,
+                    "type": graph_type,
+                },
+                ensure_ascii=False,
+            )
+
         except Exception as e:
             self.logger.log(f"グラフ生成エラー: {str(e)}")
-            return json.dumps({"error": f"グラフ生成エラー: {str(e)}"}, ensure_ascii=False)
+            return json.dumps(
+                {"error": f"グラフ生成エラー: {str(e)}"}, ensure_ascii=False
+            )
 
     def _create_line_chart(
         self,
@@ -749,7 +831,7 @@ class ToolHandler:
                 color=colors[0],
                 linewidth=2,
             )
-            
+
         # X軸のラベルが長い場合は回転
         if labels and any(len(label) > 10 for label in labels):
             plt.xticks(rotation=45, ha='right')
@@ -766,7 +848,7 @@ class ToolHandler:
         if multi_data is not None and series_labels is not None:
             x = np.arange(len(labels) if labels else len(multi_data[0]))
             width = 0.8 / len(multi_data)  # バーの幅
-            
+
             for i, series in enumerate(multi_data):
                 plt.bar(
                     x + i * width - (len(multi_data) - 1) * width / 2,
@@ -775,7 +857,7 @@ class ToolHandler:
                     color=colors[i % len(colors)],
                     label=series_labels[i],
                 )
-                
+
             plt.xticks(x, labels if labels else range(len(multi_data[0])))
         elif data is not None:
             plt.bar(
@@ -783,7 +865,7 @@ class ToolHandler:
                 data,
                 color=colors[0],
             )
-            
+
         # X軸のラベルが長い場合は回転
         if labels and any(len(label) > 10 for label in labels):
             plt.xticks(rotation=45, ha='right')
@@ -800,7 +882,7 @@ class ToolHandler:
         if multi_data is not None and series_labels is not None:
             y = np.arange(len(labels) if labels else len(multi_data[0]))
             height = 0.8 / len(multi_data)  # バーの高さ
-            
+
             for i, series in enumerate(multi_data):
                 plt.barh(
                     y + i * height - (len(multi_data) - 1) * height / 2,
@@ -809,7 +891,7 @@ class ToolHandler:
                     color=colors[i % len(colors)],
                     label=series_labels[i],
                 )
-                
+
             plt.yticks(y, labels if labels else range(len(multi_data[0])))
         elif data is not None:
             plt.barh(
@@ -831,7 +913,7 @@ class ToolHandler:
                 labels=labels,
                 autopct='%1.1f%%',
                 startangle=90,
-                colors=colors[:len(data)],
+                colors=colors[: len(data)],
                 wedgeprops={'edgecolor': 'w', 'linewidth': 1},
                 textprops={'fontsize': 10},
             )
@@ -850,10 +932,10 @@ class ToolHandler:
             # 複数系列の場合、最初の2つの系列をX軸とY軸として使用
             x_data = multi_data[0]
             y_data = multi_data[1]
-            
+
             if series_labels and len(series_labels) >= 2:
                 plt.scatter(x_data, y_data, color=colors[0], alpha=0.7)
-                
+
                 # データポイントにラベルを付ける（あれば）
                 if labels:
                     for i, label in enumerate(labels):
@@ -864,7 +946,7 @@ class ToolHandler:
         elif data is not None and labels is not None:
             # 単一系列の場合、インデックスをX軸として使用
             plt.scatter(range(len(data)), data, color=colors[0], alpha=0.7)
-            
+
             # X軸のラベルを設定
             plt.xticks(range(len(data)), labels)
 
@@ -880,51 +962,62 @@ class ToolHandler:
             str: 生成した図表のパスとメタデータのJSON文字列
         """
         if self.current_image_dir is None:
-            return json.dumps({"error": "画像ディレクトリが設定されていません"}, ensure_ascii=False)
-            
+            return json.dumps(
+                {"error": "画像ディレクトリが設定されていません"}, ensure_ascii=False
+            )
+
         try:
             self.logger.log(f"Mermaid図をレンダリング: {title or 'タイトルなし'}")
-            
+
             # 出力ファイル名を生成
             filename = f"mermaid_{uuid.uuid4().hex}.png"
             output_path = os.path.join(self.current_image_dir, filename)
-            
+
             # mermaid_cliライブラリを使用してレンダリング
             try:
 
-                
                 # 非同期関数を実行するためのイベントループを取得
                 loop = asyncio.get_event_loop()
-                
+
                 # render_mermaid関数を実行
-                _, _, image_data = loop.run_until_complete(render_mermaid(
-                    mermaid_code,
-                    output_format="png",
-                    background_color="white",
-                    mermaid_config={"theme": "forest"}
-                ))
-                
+                _, _, image_data = loop.run_until_complete(
+                    render_mermaid(
+                        mermaid_code,
+                        output_format="png",
+                        background_color="white",
+                        mermaid_config={"theme": "forest"},
+                    )
+                )
+
                 # 画像データをファイルに保存
                 with open(output_path, 'wb') as f:
                     f.write(image_data)
-                
+
                 # 相対パスに変換
-                rel_path = os.path.relpath(output_path, start=os.path.dirname(self.current_image_dir))
-                
+                rel_path = os.path.relpath(
+                    output_path, start=os.path.dirname(self.current_image_dir)
+                )
+
                 self.logger.log(f"Mermaid図を生成しました: {output_path}")
-                
-                return json.dumps({
-                    "mermaid_path": rel_path,
-                    "title": title or "Mermaid Diagram",
-                    "type": "mermaid",
-                }, ensure_ascii=False)
-                
+
+                return json.dumps(
+                    {
+                        "mermaid_path": rel_path,
+                        "title": title or "Mermaid Diagram",
+                        "type": "mermaid",
+                    },
+                    ensure_ascii=False,
+                )
+
             except ImportError:
                 self.logger.log("mermaid_cliライブラリがインストールされていません。")
-                
+
         except Exception as e:
             self.logger.log(f"Mermaid図のレンダリングエラー: {str(e)}")
-            return json.dumps({"error": f"Mermaid図のレンダリングエラー: {str(e)}"}, ensure_ascii=False)
+            return json.dumps(
+                {"error": f"Mermaid図のレンダリングエラー: {str(e)}"},
+                ensure_ascii=False,
+            )
 
     def extract_mermaid_diagrams(self, text: str) -> List[Tuple[str, str]]:
         """
@@ -937,7 +1030,7 @@ class ToolHandler:
             List[Tuple[str, str]]: (図のタイトル, Mermaidコード) のタプルのリスト
         """
         diagrams = []
-        
+
         # Mermaidコードブロックを検索
         # ```mermaid ... ``` 形式
         pattern1 = r'```mermaid\s+(.*?)```'
@@ -945,20 +1038,28 @@ class ToolHandler:
         for match in matches1:
             mermaid_code = match.group(1).strip()
             # タイトルを抽出（最初の行がタイトルっぽい場合）
-            title_match = re.search(r'^(graph|flowchart|sequenceDiagram|classDiagram|stateDiagram|erDiagram|gantt|pie|journey)\s+(.+?)$', mermaid_code, re.MULTILINE)
+            title_match = re.search(
+                r'^(graph|flowchart|sequenceDiagram|classDiagram|stateDiagram|erDiagram|gantt|pie|journey)\s+(.+?)$',
+                mermaid_code,
+                re.MULTILINE,
+            )
             title = title_match.group(2) if title_match else "Mermaid Diagram"
             diagrams.append((title, mermaid_code))
-        
+
         # <mermaid> ... </mermaid> 形式
         pattern2 = r'<mermaid>\s*(.*?)\s*</mermaid>'
         matches2 = re.finditer(pattern2, text, re.DOTALL)
         for match in matches2:
             mermaid_code = match.group(1).strip()
             # タイトルを抽出（最初の行がタイトルっぽい場合）
-            title_match = re.search(r'^(graph|flowchart|sequenceDiagram|classDiagram|stateDiagram|erDiagram|gantt|pie|journey)\s+(.+?)$', mermaid_code, re.MULTILINE)
+            title_match = re.search(
+                r'^(graph|flowchart|sequenceDiagram|classDiagram|stateDiagram|erDiagram|gantt|pie|journey)\s+(.+?)$',
+                mermaid_code,
+                re.MULTILINE,
+            )
             title = title_match.group(2) if title_match else "Mermaid Diagram"
             diagrams.append((title, mermaid_code))
-        
+
         return diagrams
 
     def process_tool_response(self, model_response: Dict) -> Optional[Dict]:
@@ -981,6 +1082,6 @@ class ToolHandler:
                 if isinstance(content_item, dict) and 'toolUse' in content_item:
                     return content_item['toolUse']
         except (AttributeError, TypeError) as e:
-            # エラーが発生した場合はNoneを返す
+            self.logger.log(f'Error: {model_response, e}')
             pass
         return None
