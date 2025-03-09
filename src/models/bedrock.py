@@ -20,22 +20,22 @@ class BedrockModel:
     エラー処理と再試行ロジックを提供します。
     """
 
-    def __init__(self,logger):
+    def __init__(self, logger):
         """
         Bedrock クライアントの初期化
 
         設定されたタイムアウト値でBedrock RuntimeクライアントをセットアップしLLM接続設定を適用します。
         """
         self.client = boto3.client(
-            'bedrock-runtime',
+            "bedrock-runtime",
             config=Config(
-                connect_timeout=LLM_CONNECTION['timeout'],
-                read_timeout=LLM_CONNECTION['timeout'],
+                connect_timeout=LLM_CONNECTION["timeout"],
+                read_timeout=LLM_CONNECTION["timeout"],
             ),
         )
-        self.max_retries = LLM_CONNECTION['max_retries']
-        self.base_delay = LLM_CONNECTION['base_delay']
-        self.max_delay = LLM_CONNECTION['max_delay']
+        self.max_retries = LLM_CONNECTION["max_retries"]
+        self.base_delay = LLM_CONNECTION["base_delay"]
+        self.max_delay = LLM_CONNECTION["max_delay"]
         self.logger = logger
 
     def _exponential_backoff(self, retry_count: int) -> float:
@@ -83,14 +83,14 @@ class BedrockModel:
         """
         # APIリクエストのパラメータを構築
         kwargs = {
-            'modelId': model_id,
-            'messages': messages,
-            'system': system_prompt,
-            'inferenceConfig': inference_config,
+            "modelId": model_id,
+            "messages": messages,
+            "system": system_prompt,
+            "inferenceConfig": inference_config,
         }
 
         if tool_config:
-            kwargs['toolConfig'] = tool_config
+            kwargs["toolConfig"] = tool_config
 
         # リトライロジックの実装
         retry_count = 0
@@ -99,12 +99,12 @@ class BedrockModel:
                 response = self.client.converse(**kwargs)
                 return response  # 成功したレスポンスを即座に返す
             except ClientError as e:
-                error_code = e.response['Error']['Code']
+                error_code = e.response["Error"]["Code"]
                 # 一時的なエラーの場合はリトライ
                 if error_code in [
-                    'ThrottlingException',
-                    'ServiceUnavailable',
-                    'InternalServerError',
+                    "ThrottlingException",
+                    "ServiceUnavailable",
+                    "InternalServerError",
                 ]:
                     if retry_count == self.max_retries:
                         raise ModelError(
@@ -144,27 +144,27 @@ class BedrockModel:
         try:
             # PDFファイルをアップロードしてテキストを抽出するためのプロンプト
             prompt = "あなたは優秀なリサーチャーです。PDFの内容から、コンテキストを全て維持した状態で、中の図や文字列を解釈して内容を長文で説明するようにお願いします。"
-            
+
             # APIリクエストのパラメータを構築
             kwargs = {
-                'modelId': model_id,
-                'messages': [
+                "modelId": model_id,
+                "messages": [
                     {
-                        'role': 'user',
-                        'content': [
+                        "role": "user",
+                        "content": [
                             {
-                                "document":{
+                                "document": {
                                     "name": "PDF Document",
                                     "format": "pdf",
-                                    "source": {"bytes": pdf_content}
+                                    "source": {"bytes": pdf_content},
                                 }
-                            },       
-                            {'text': prompt}
-                        ]
+                            },
+                            {"text": prompt},
+                        ],
                     }
-                ]
+                ],
             }
-            
+
             # リトライロジックの実装
             retry_count = 0
             while retry_count <= self.max_retries:
@@ -173,23 +173,27 @@ class BedrockModel:
                     response = self.client.converse(**kwargs)
                     self.logger.log(f"PDF / response: {response}")
                     # レスポンスからテキストを抽出
-                    if 'output' in response and 'message' in response['output'] and 'content' in response['output']['message']:
-                        for content in response['output']['message']['content']:
-                            if 'text' in content:
-                                return content['text']
-                    
+                    if (
+                        "output" in response
+                        and "message" in response["output"]
+                        and "content" in response["output"]["message"]
+                    ):
+                        for content in response["output"]["message"]["content"]:
+                            if "text" in content:
+                                return content["text"]
+
                     # テキストが見つからない場合は空文字列を返す
                     return ""
-                    
+
                 except ClientError as e:
-                    error_code = e.response['Error']['Code']
+                    error_code = e.response["Error"]["Code"]
                     self.logger.log(f"PDF / Bedrock error_code: {error_code}")
 
                     # 一時的なエラーの場合はリトライ
                     if error_code in [
-                        'ThrottlingException',
-                        'ServiceUnavailable',
-                        'InternalServerError',
+                        "ThrottlingException",
+                        "ServiceUnavailable",
+                        "InternalServerError",
                     ]:
                         if retry_count == self.max_retries:
                             raise ModelError(
@@ -202,10 +206,14 @@ class BedrockModel:
                         retry_count += 1
                     else:
                         # その他のエラータイプは即座に例外を発生
-                        raise ModelError(f"Bedrock API error during PDF processing: {str(e)}")
+                        raise ModelError(
+                            f"Bedrock API error during PDF processing: {str(e)}"
+                        )
                 except Exception as e:
                     # 予期しないエラー
-                    raise ModelError(f"Unexpected error during PDF processing: {str(e)}")
-                    
+                    raise ModelError(
+                        f"Unexpected error during PDF processing: {str(e)}"
+                    )
+
         except Exception as e:
             raise ModelError(f"Error processing PDF: {str(e)}")

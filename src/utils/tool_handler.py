@@ -12,7 +12,7 @@ import uuid
 import matplotlib.pyplot as plt
 import matplotlib
 
-matplotlib.use('Agg')  # Use non-interactive backend
+matplotlib.use("Agg")  # Use non-interactive backend
 import matplotlib_fontja
 import numpy as np
 from ..utils.exceptions import ToolError
@@ -53,7 +53,7 @@ class ToolHandler:
 
     def _get_http_headers(self):
         obj = {
-            'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36'
+            "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36"
         }
         return obj
 
@@ -75,8 +75,8 @@ class ToolHandler:
         self.logger = logger
         # 現在のレポートの画像ディレクトリ
         self.current_image_dir = f"{base_filename}_images"
-        self.max_pdf_size = PDF_CONFIG['max_size']
-        self.max_bedrock_converse_limit = PDF_CONFIG['bedrock_max_size']
+        self.max_pdf_size = PDF_CONFIG["max_size"]
+        self.max_bedrock_converse_limit = PDF_CONFIG["bedrock_max_size"]
 
     def _load_api_key(self) -> str:
         """
@@ -91,7 +91,7 @@ class ToolHandler:
             ToolError: API キーファイルが見つからない場合
         """
         try:
-            return Path('.brave').read_text().strip()
+            return Path(".brave").read_text().strip()
         except FileNotFoundError:
             raise ToolError("Brave API key file (.brave) not found")
         except Exception as e:
@@ -132,7 +132,7 @@ class ToolHandler:
                 return None, 0
 
             # Content-Lengthヘッダーからファイルサイズを取得
-            content_length = int(response.headers.get('Content-Length', 0))
+            content_length = int(response.headers.get("Content-Length", 0))
             self.logger.log(f"ファイルサイズ: {content_length} bytes")
 
             # ファイルサイズが50MB以上の場合はダウンロードしない
@@ -183,7 +183,7 @@ class ToolHandler:
 
         try:
             # 一時ファイルにPDFを保存
-            with tempfile.NamedTemporaryFile(suffix='.pdf', delete=False) as temp_file:
+            with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as temp_file:
                 temp_file.write(pdf_content)
                 temp_path = temp_file.name
 
@@ -193,15 +193,15 @@ class ToolHandler:
 
             # PDFのメタデータからタイトルを取得
             metadata = pdf_document.metadata
-            if metadata and 'title' in metadata and metadata['title']:
-                pdf_title = metadata['title']
+            if metadata and "title" in metadata and metadata["title"]:
+                pdf_title = metadata["title"]
             else:
                 # タイトルがない場合は最初のページからテキストを抽出して推測
                 first_page = pdf_document[0]
                 text = first_page.get_text()
                 # 最初の行をタイトルとして使用（最大100文字）
                 if text:
-                    lines = text.strip().split('\n')
+                    lines = text.strip().split("\n")
                     if lines:
                         pdf_title = lines[0][:100]
 
@@ -224,13 +224,13 @@ class ToolHandler:
 
                         # 許可された拡張子かチェック
                         if image_ext.lower() not in [
-                            f.lstrip('.').lower()
-                            for f in IMAGE_CONFIG['allowed_formats']
+                            f.lstrip(".").lower()
+                            for f in IMAGE_CONFIG["allowed_formats"]
                         ]:
                             continue
 
                         # 画像サイズのチェック
-                        if len(image_bytes) > IMAGE_CONFIG['max_size']:
+                        if len(image_bytes) > IMAGE_CONFIG["max_size"]:
                             continue
 
                         # 画像の幅と高さを取得
@@ -246,7 +246,7 @@ class ToolHandler:
                         filename = f"{uuid.uuid4().hex}.{image_ext}"
                         filepath = os.path.join(self.current_image_dir, filename)
 
-                        with open(filepath, 'wb') as img_file:
+                        with open(filepath, "wb") as img_file:
                             img_file.write(image_bytes)
 
                         self.logger.log(
@@ -273,7 +273,7 @@ class ToolHandler:
             self.logger.log(f"PDF抽出エラー: {str(e)}")
             # 一時ファイルが残っていれば削除を試みる
             try:
-                if 'temp_path' in locals():
+                if "temp_path" in locals():
                     os.unlink(temp_path)
             except:
                 pass
@@ -309,11 +309,11 @@ class ToolHandler:
                 return "", ""
 
             # コンテンツタイプのチェック
-            content_type = response.headers.get('Content-Type', '').lower()
+            content_type = response.headers.get("Content-Type", "").lower()
             self.logger.log(f"コンテンツタイプ: {content_type}")
 
             # PDFファイルの場合
-            if 'pdf' in content_type or url.lower().endswith('.pdf'):
+            if "pdf" in content_type or url.lower().endswith(".pdf"):
                 # PDFファイルをダウンロード
                 pdf_content, file_size = self._download_pdf(url)
 
@@ -378,8 +378,8 @@ class ToolHandler:
 
             # その他のバイナリコンテンツの場合は処理をスキップ
             if (
-                'application/' in content_type or 'image/' in content_type
-            ) and 'application/json' not in content_type:
+                "application/" in content_type or "image/" in content_type
+            ) and "application/json" not in content_type:
                 return (
                     f"[このコンテンツは{content_type}ファイルであり、直接処理できません。"
                     f"ファイルを手動でダウンロードして確認してください。]",
@@ -388,21 +388,21 @@ class ToolHandler:
 
             # エンコーディングを設定
             response.encoding = response.apparent_encoding
-            soup = BeautifulSoup(response.text, 'html.parser')
+            soup = BeautifulSoup(response.text, "html.parser")
 
             # タイトルの取得と整形
             title = soup.title.string if soup.title else ""
             title = " ".join(title.split())
 
             # 不要なHTML要素を削除
-            for tag in soup(['script', 'style', 'header', 'footer', 'nav']):
+            for tag in soup(["script", "style", "header", "footer", "nav"]):
                 tag.decompose()
 
             # テキストを行ごとに抽出して結合
             lines = [
                 line.strip() for line in soup.get_text().splitlines() if line.strip()
             ]
-            return '\n'.join(lines), title
+            return "\n".join(lines), title
 
         except requests.Timeout:
             self.logger.log(f"コンテンツ取得エラー: タイムアウト")
@@ -430,7 +430,7 @@ class ToolHandler:
             str: 検索結果のJSON文字列。エラー時は空文字列
         """
         # 全角スペースを半角に変換
-        query = query.replace('　', ' ')
+        query = query.replace("　", " ")
         results = []
 
         try:
@@ -452,12 +452,12 @@ class ToolHandler:
             data = response.json()
 
             # 検索結果の処理
-            if 'web' in data and 'results' in data['web']:
-                for result in data['web']['results']:
+            if "web" in data and "results" in data["web"]:
+                for result in data["web"]["results"]:
                     result_dict = {
-                        "title": result.get('title', ''),
-                        "url": result.get('url', ''),
-                        "description": result.get('description', ''),
+                        "title": result.get("title", ""),
+                        "url": result.get("url", ""),
+                        "description": result.get("description", ""),
                     }
                     if result_dict["title"] and result_dict["url"]:
                         results.append(result_dict)
@@ -494,11 +494,11 @@ class ToolHandler:
             )
 
         # 全角スペースを半角に変換
-        query = query.replace('　', ' ')
+        query = query.replace("　", " ")
 
         # 最大画像数の設定
         if max_results is None:
-            max_results = IMAGE_CONFIG['max_images']
+            max_results = IMAGE_CONFIG["max_images"]
         else:
             max_results = min(max_results, 10)  # 最大10枚に制限
 
@@ -528,20 +528,20 @@ class ToolHandler:
             data = response.json()
 
             # 検索結果の処理
-            if 'results' in data:
+            if "results" in data:
                 count = 0
-                for image in data['results']:
+                for image in data["results"]:
                     if count >= max_results:
                         break
 
                     # 画像URLの取得
-                    property_dict = image.get('properties', {})
-                    image_url = property_dict.get('url', '') if property_dict else None
+                    property_dict = image.get("properties", {})
+                    image_url = property_dict.get("url", "") if property_dict else None
                     if not image_url:
                         continue
 
                     # 画像の拡張子を取得
-                    ext = self._get_image_extension(image_url, image.get('format', ''))
+                    ext = self._get_image_extension(image_url, image.get("format", ""))
                     if not ext:
                         continue
 
@@ -557,11 +557,11 @@ class ToolHandler:
                         saved_images.append(
                             {
                                 "path": rel_path,
-                                "title": image.get('title', ''),
-                                "source_url": image.get('sourceUrl', ''),
-                                "width": image.get('width', 0),
-                                "height": image.get('height', 0),
-                                "format": image.get('format', ''),
+                                "title": image.get("title", ""),
+                                "source_url": image.get("sourceUrl", ""),
+                                "width": image.get("width", 0),
+                                "height": image.get("height", 0),
+                                "format": image.get("format", ""),
                             }
                         )
                         count += 1
@@ -590,29 +590,29 @@ class ToolHandler:
             str: 拡張子（ドットを含む）。不明な場合は空文字列
         """
         # URLから拡張子を取得
-        path = url.split('?')[0]  # クエリパラメータを除去
+        path = url.split("?")[0]  # クエリパラメータを除去
         ext = os.path.splitext(path)[1].lower()
 
         # 拡張子が取得できない場合はフォーマット文字列から推測
         if not ext and format_str:
             format_lower = format_str.lower()
-            if 'jpeg' in format_lower or 'jpg' in format_lower:
-                ext = '.jpg'
-            elif 'png' in format_lower:
-                ext = '.png'
-            elif 'gif' in format_lower:
-                ext = '.gif'
-            elif 'webp' in format_lower:
-                ext = '.webp'
+            if "jpeg" in format_lower or "jpg" in format_lower:
+                ext = ".jpg"
+            elif "png" in format_lower:
+                ext = ".png"
+            elif "gif" in format_lower:
+                ext = ".gif"
+            elif "webp" in format_lower:
+                ext = ".webp"
 
         # 拡張子から先頭のドットを除去して小文字に変換
-        if ext.startswith('.'):
+        if ext.startswith("."):
             ext = ext[1:]
         ext = ext.lower()
 
         # 許可された拡張子かチェック
         allowed_formats = [
-            f.lstrip('.').lower() for f in IMAGE_CONFIG['allowed_formats']
+            f.lstrip(".").lower() for f in IMAGE_CONFIG["allowed_formats"]
         ]
         if ext in allowed_formats:
             return f".{ext}"
@@ -642,14 +642,14 @@ class ToolHandler:
                 return None
 
             # Content-Typeのチェック
-            content_type = response.headers.get('Content-Type', '').lower()
-            if not ('image/' in content_type):
+            content_type = response.headers.get("Content-Type", "").lower()
+            if not ("image/" in content_type):
                 self.logger.log(f"画像ではないコンテンツ: {content_type}")
                 return None
 
             # ファイルサイズのチェック
-            content_length = int(response.headers.get('Content-Length', 0))
-            if content_length > IMAGE_CONFIG['max_size']:
+            content_length = int(response.headers.get("Content-Length", 0))
+            if content_length > IMAGE_CONFIG["max_size"]:
                 self.logger.log(f"画像サイズ制限超過: {content_length} bytes")
                 return None
 
@@ -658,7 +658,7 @@ class ToolHandler:
             filepath = os.path.join(self.current_image_dir, filename)
 
             # 画像を保存
-            with open(filepath, 'wb') as f:
+            with open(filepath, "wb") as f:
                 f.write(response.content)
 
             self.logger.log(f"画像を保存しました: {filepath}")
@@ -704,7 +704,7 @@ class ToolHandler:
 
         try:
             # データの検証
-            if graph_type not in ['line', 'bar', 'pie', 'scatter', 'horizontal_bar']:
+            if graph_type not in ["line", "bar", "pie", "scatter", "horizontal_bar"]:
                 return json.dumps(
                     {"error": f"不正なグラフタイプ: {graph_type}"}, ensure_ascii=False
                 )
@@ -735,43 +735,43 @@ class ToolHandler:
 
             # 色の設定
             if colors is None:
-                colors = GRAPH_CONFIG['default_colors']
+                colors = GRAPH_CONFIG["default_colors"]
 
             # フィギュアの作成
-            plt.figure(figsize=GRAPH_CONFIG['default_figsize'], dpi=GRAPH_CONFIG['dpi'])
+            plt.figure(figsize=GRAPH_CONFIG["default_figsize"], dpi=GRAPH_CONFIG["dpi"])
 
             # グラフの種類に応じて描画
-            if graph_type == 'line':
+            if graph_type == "line":
                 self._create_line_chart(labels, data, multi_data, series_labels, colors)
-            elif graph_type == 'bar':
+            elif graph_type == "bar":
                 self._create_bar_chart(labels, data, multi_data, series_labels, colors)
-            elif graph_type == 'horizontal_bar':
+            elif graph_type == "horizontal_bar":
                 self._create_horizontal_bar_chart(
                     labels, data, multi_data, series_labels, colors
                 )
-            elif graph_type == 'pie':
+            elif graph_type == "pie":
                 self._create_pie_chart(labels, data, colors)
-            elif graph_type == 'scatter':
+            elif graph_type == "scatter":
                 self._create_scatter_plot(
                     labels, data, multi_data, series_labels, colors
                 )
 
             # タイトルと軸ラベルの設定
             plt.title(title, fontsize=16)
-            if x_label and graph_type != 'pie':
+            if x_label and graph_type != "pie":
                 plt.xlabel(x_label, fontsize=12)
-            if y_label and graph_type != 'pie':
+            if y_label and graph_type != "pie":
                 plt.ylabel(y_label, fontsize=12)
 
             # 凡例の設定（必要な場合）
             if (
                 multi_data is not None and series_labels is not None
-            ) or graph_type == 'pie':
-                plt.legend(loc='best')
+            ) or graph_type == "pie":
+                plt.legend(loc="best")
 
             # グリッドの設定（円グラフ以外）
-            if graph_type != 'pie':
-                plt.grid(True, linestyle='--', alpha=0.7)
+            if graph_type != "pie":
+                plt.grid(True, linestyle="--", alpha=0.7)
 
             # レイアウトの調整
             plt.tight_layout()
@@ -818,7 +818,7 @@ class ToolHandler:
                 plt.plot(
                     labels if labels else range(len(series)),
                     series,
-                    marker='o',
+                    marker="o",
                     color=colors[i % len(colors)],
                     label=series_labels[i],
                     linewidth=2,
@@ -827,14 +827,14 @@ class ToolHandler:
             plt.plot(
                 labels if labels else range(len(data)),
                 data,
-                marker='o',
+                marker="o",
                 color=colors[0],
                 linewidth=2,
             )
 
         # X軸のラベルが長い場合は回転
         if labels and any(len(label) > 10 for label in labels):
-            plt.xticks(rotation=45, ha='right')
+            plt.xticks(rotation=45, ha="right")
 
     def _create_bar_chart(
         self,
@@ -868,7 +868,7 @@ class ToolHandler:
 
         # X軸のラベルが長い場合は回転
         if labels and any(len(label) > 10 for label in labels):
-            plt.xticks(rotation=45, ha='right')
+            plt.xticks(rotation=45, ha="right")
 
     def _create_horizontal_bar_chart(
         self,
@@ -911,13 +911,13 @@ class ToolHandler:
             plt.pie(
                 data,
                 labels=labels,
-                autopct='%1.1f%%',
+                autopct="%1.1f%%",
                 startangle=90,
                 colors=colors[: len(data)],
-                wedgeprops={'edgecolor': 'w', 'linewidth': 1},
-                textprops={'fontsize': 10},
+                wedgeprops={"edgecolor": "w", "linewidth": 1},
+                textprops={"fontsize": 10},
             )
-            plt.axis('equal')  # 円を真円に
+            plt.axis("equal")  # 円を真円に
 
     def _create_scatter_plot(
         self,
@@ -990,7 +990,7 @@ class ToolHandler:
                 )
 
                 # 画像データをファイルに保存
-                with open(output_path, 'wb') as f:
+                with open(output_path, "wb") as f:
                     f.write(image_data)
 
                 # 相対パスに変換
@@ -1033,13 +1033,13 @@ class ToolHandler:
 
         # Mermaidコードブロックを検索
         # ```mermaid ... ``` 形式
-        pattern1 = r'```mermaid\s+(.*?)```'
+        pattern1 = r"```mermaid\s+(.*?)```"
         matches1 = re.finditer(pattern1, text, re.DOTALL)
         for match in matches1:
             mermaid_code = match.group(1).strip()
             # タイトルを抽出（最初の行がタイトルっぽい場合）
             title_match = re.search(
-                r'^(graph|flowchart|sequenceDiagram|classDiagram|stateDiagram|erDiagram|gantt|pie|journey)\s+(.+?)$',
+                r"^(graph|flowchart|sequenceDiagram|classDiagram|stateDiagram|erDiagram|gantt|pie|journey)\s+(.+?)$",
                 mermaid_code,
                 re.MULTILINE,
             )
@@ -1047,13 +1047,13 @@ class ToolHandler:
             diagrams.append((title, mermaid_code))
 
         # <mermaid> ... </mermaid> 形式
-        pattern2 = r'<mermaid>\s*(.*?)\s*</mermaid>'
+        pattern2 = r"<mermaid>\s*(.*?)\s*</mermaid>"
         matches2 = re.finditer(pattern2, text, re.DOTALL)
         for match in matches2:
             mermaid_code = match.group(1).strip()
             # タイトルを抽出（最初の行がタイトルっぽい場合）
             title_match = re.search(
-                r'^(graph|flowchart|sequenceDiagram|classDiagram|stateDiagram|erDiagram|gantt|pie|journey)\s+(.+?)$',
+                r"^(graph|flowchart|sequenceDiagram|classDiagram|stateDiagram|erDiagram|gantt|pie|journey)\s+(.+?)$",
                 mermaid_code,
                 re.MULTILINE,
             )
@@ -1076,12 +1076,12 @@ class ToolHandler:
         """
         try:
             content_list = (
-                model_response.get('output', {}).get('message', {}).get('content', [])
+                model_response.get("output", {}).get("message", {}).get("content", [])
             )
             for content_item in content_list:
-                if isinstance(content_item, dict) and 'toolUse' in content_item:
-                    return content_item['toolUse']
+                if isinstance(content_item, dict) and "toolUse" in content_item:
+                    return content_item["toolUse"]
         except (AttributeError, TypeError) as e:
-            self.logger.log(f'Error: {model_response, e}')
+            self.logger.log(f"Error: {model_response, e}")
             pass
         return None

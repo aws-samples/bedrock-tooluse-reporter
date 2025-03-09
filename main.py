@@ -30,13 +30,13 @@ def main():
     Returns:
         int: 0 for successful execution, 1 for errors
     """
-    parser = argparse.ArgumentParser(description='AI Research Assistant')
-    parser.add_argument('--prompt', required=True, help='Research prompt/question')
+    parser = argparse.ArgumentParser(description="AI Research Assistant")
+    parser.add_argument("--prompt", required=True, help="Research prompt/question")
     parser.add_argument(
-        '--mode',
-        choices=['standard', 'summary'],
-        default='standard',
-        help='Research mode: standard (default) or summary',
+        "--mode",
+        choices=["standard", "summary"],
+        default="standard",
+        help="Research mode: standard (default) or summary",
     )
     args = parser.parse_args()
 
@@ -45,11 +45,11 @@ def main():
 
     try:
         # 出力ディレクトリの作成
-        output_dir = 'reports'
+        output_dir = "reports"
         os.makedirs(output_dir, exist_ok=True)
 
         # ファイル名の生成
-        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         base_filename = os.path.join(output_dir, f"report_{timestamp}")
 
         # 画像ディレクトリの作成

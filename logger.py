@@ -14,7 +14,7 @@ class DualLogger:
     両方に出力するためのインターフェースを提供します。
     """
 
-    def __init__(self, output_dir: str = 'logs'):
+    def __init__(self, output_dir: str = "logs"):
         """
         コンソールとファイルの両方に出力するロガーの初期化
 
@@ -25,11 +25,11 @@ class DualLogger:
         os.makedirs(output_dir, exist_ok=True)
 
         # ログファイル名に現在時刻を含める
-        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-        self.log_file = os.path.join(output_dir, f'research_log_{timestamp}.txt')
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        self.log_file = os.path.join(output_dir, f"research_log_{timestamp}.txt")
 
         # ロガーの設定
-        self.logger = logging.getLogger('research_logger')
+        self.logger = logging.getLogger("research_logger")
         self.logger.setLevel(logging.INFO)
 
         # 既存のハンドラをクリア（複数回の初期化を防止）
@@ -37,7 +37,7 @@ class DualLogger:
             self.logger.handlers.clear()
 
         # ファイルハンドラの設定
-        file_handler = logging.FileHandler(self.log_file, encoding='utf-8')
+        file_handler = logging.FileHandler(self.log_file, encoding="utf-8")
         file_handler.setLevel(logging.INFO)
 
         # コンソールハンドラの設定
@@ -45,7 +45,7 @@ class DualLogger:
         console_handler.setLevel(logging.INFO)
 
         # フォーマッターの設定
-        formatter = logging.Formatter('%(message)s')
+        formatter = logging.Formatter("%(message)s")
         file_handler.setFormatter(formatter)
         console_handler.setFormatter(formatter)
 

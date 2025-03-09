@@ -31,14 +31,14 @@ class SourceReference:
             Dict: Dictionary representation of the reference
         """
         return {
-            'url': self.url,
-            'title': self.title,
-            'accessed_at': self.accessed_at,
-            'reference_number': self.reference_number,
+            "url": self.url,
+            "title": self.title,
+            "accessed_at": self.accessed_at,
+            "reference_number": self.reference_number,
         }
 
     @staticmethod
-    def from_dict(data: Dict) -> 'SourceReference':
+    def from_dict(data: Dict) -> "SourceReference":
         """
         Create a SourceReference instance from a dictionary.
 
@@ -49,10 +49,10 @@ class SourceReference:
             SourceReference: New instance created from dictionary data
         """
         return SourceReference(
-            url=data['url'],
-            title=data['title'],
-            accessed_at=data['accessed_at'],
-            reference_number=data.get('reference_number'),
+            url=data["url"],
+            title=data["title"],
+            accessed_at=data["accessed_at"],
+            reference_number=data.get("reference_number"),
         )
 
     def get_citation_mark(self) -> str:

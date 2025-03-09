@@ -78,10 +78,10 @@ class ReportBuilder:
             # 視覚化データがない場合は空の辞書を使用
             if visualization_data is None:
                 visualization_data = {
-                    'graphs': [],
-                    'tables': [],
-                    'mermaid_diagrams': [],
-                    'images_with_context': [],
+                    "graphs": [],
+                    "tables": [],
+                    "mermaid_diagrams": [],
+                    "images_with_context": [],
                 }
 
             # 視覚化データの情報をログに出力
@@ -184,7 +184,7 @@ class ReportBuilder:
             str: 生成されたレポートテキスト
         """
         complete_response = ""
-        last_markers = REPORT_CONFIG['completion_markers']
+        last_markers = REPORT_CONFIG["completion_markers"]
         attempt = 0
         prompt_text = report_prompt
         chapter_references = set()
@@ -220,12 +220,12 @@ class ReportBuilder:
                 messages,
                 [{"text": prompt_text}],
                 {
-                    'temperature': PROMPT_CONFIG['temperature']['default'],
-                    'maxTokens': PROMPT_CONFIG['max_tokens'],
+                    "temperature": PROMPT_CONFIG["temperature"]["default"],
+                    "maxTokens": PROMPT_CONFIG["max_tokens"],
                 },
             )
 
-            current_text = response['output']['message']['content'][0]['text']
+            current_text = response["output"]["message"]["content"][0]["text"]
 
             self.logger.log("レポートの一部引用:")
             summary = (
@@ -290,10 +290,10 @@ class ReportBuilder:
                 "role": "user",
                 "content": [
                     {
-                        "text": f'''<title>{user_prompt}」</title>
+                        "text": f"""<title>{user_prompt}」</title>
 <strategy>{strategy_text}</strategy>
 <data>{research_text}</data>
-<reference-info>{reference_info}</reference-info>'''
+<reference-info>{reference_info}</reference-info>"""
                     }
                 ],
             }
@@ -318,7 +318,7 @@ class ReportBuilder:
         """
         # モードに応じた出力指示を追加
         if mode == "standard":
-            output_instruction = '''* ナレーティブに文章を書く。安易に箇条書きを用いない
+            output_instruction = """* ナレーティブに文章を書く。安易に箇条書きを用いない
 * 必要に応じて、情報収集フェーズで画像検索ツールを使用してダウンロードした関連画像を相対パスとしてレポートに含める
 * 必要に応じて、情報収集フェーズでグラフ作成ツールを仕様して作成したグラフ画像を相対パスとしてレポートに含め、視覚的に理解しやすい資料とする
 * 画像やグラフを使用する場合は、本文との配置を工夫し、読みやすいレイアウトにする
@@ -326,10 +326,10 @@ class ReportBuilder:
 * 調査戦略にまとめた"章ごと"に詳細なコンテキストを全て維持する
 * 箇条書きではなく長文、または、表を出力する
 * レポート分は客観的なデータポイントについて詳細に解説し、それを論拠として、考察と推論について述べる順番でロジックを展開する
-* 専門的な説明や具体的な内容、データや数値など詳細なコンテキストは全て維持する'''
+* 専門的な説明や具体的な内容、データや数値など詳細なコンテキストは全て維持する"""
         else:
             # summary mode
-            output_instruction = '''* 簡潔に要点をまとめる。要約してレポート全体を一度に出力する。
+            output_instruction = """* 簡潔に要点をまとめる。要約してレポート全体を一度に出力する。
 * 調査戦略にまとめた戦略に基づいて、必要なところでデータポイントを詳細に引用する。
 * 箇条書き・表は利用して良い。
 * レポート分は客観的なデータポイントについて解説し、それを論拠として、考察と推論について述べる順番でロジックを展開する
@@ -339,7 +339,7 @@ class ReportBuilder:
 * ナレーティブに文章を書く。
 * 必要に応じて、情報収集フェーズで画像検索ツールを使用してダウンロードした関連画像を相対パスとしてレポートに含める
 * 必要に応じて、情報収集フェーズでグラフ作成ツールを仕様して作成したグラフ画像を相対パスとしてレポートに含め、視覚的に理解しやすい資料とする
-* 画像やグラフを使用する場合は、本文との配置を工夫し、読みやすいレイアウトにする'''
+* 画像やグラフを使用する場合は、本文との配置を工夫し、読みやすいレイアウトにする"""
 
         # 画像ディレクトリ
         image_dir = f"{self.base_filename}_images"
@@ -348,40 +348,40 @@ class ReportBuilder:
         visualization_info = ""
 
         # グラフ情報
-        if visualization_data and visualization_data.get('graphs'):
+        if visualization_data and visualization_data.get("graphs"):
             visualization_info += "\n\n以下のグラフ画像が利用可能です。適切な箇所でこれらを参照してください：\n"
-            for i, graph in enumerate(visualization_data['graphs']):
-                if 'graph_path' in graph:
-                    purpose = graph.get('purpose', '不明')
+            for i, graph in enumerate(visualization_data["graphs"]):
+                if "graph_path" in graph:
+                    purpose = graph.get("purpose", "不明")
                     purpose_info = f" (目的: {purpose})" if purpose else ""
                     visualization_info += f"- グラフ{i+1}: {graph['graph_path']} (タイトル: {graph.get('title', '不明')}, タイプ: {graph.get('type', '不明')}{purpose_info})\n"
 
         # Mermaid図の情報
-        if visualization_data and visualization_data.get('mermaid_diagrams'):
+        if visualization_data and visualization_data.get("mermaid_diagrams"):
             visualization_info += "\n\n以下のMermaid図が利用可能です。適切な箇所でこれらを参照してください：\n"
-            for i, diagram in enumerate(visualization_data['mermaid_diagrams']):
-                if 'mermaid_path' in diagram:
-                    purpose = diagram.get('purpose', '不明')
+            for i, diagram in enumerate(visualization_data["mermaid_diagrams"]):
+                if "mermaid_path" in diagram:
+                    purpose = diagram.get("purpose", "不明")
                     purpose_info = f" (目的: {purpose})" if purpose else ""
                     visualization_info += f"- Mermaid図{i+1}: {diagram['mermaid_path']} (タイトル: {diagram.get('title', '不明')}{purpose_info})\n"
 
         # 文脈付き画像の情報
-        if visualization_data and visualization_data.get('images_with_context'):
+        if visualization_data and visualization_data.get("images_with_context"):
             visualization_info += "\n\n以下の画像には文脈情報が付加されています。適切な箇所でこれらを参照してください：\n"
-            for i, img_ctx in enumerate(visualization_data['images_with_context']):
-                if 'path' in img_ctx:
-                    caption = img_ctx.get('caption', '説明なし')
+            for i, img_ctx in enumerate(visualization_data["images_with_context"]):
+                if "path" in img_ctx:
+                    caption = img_ctx.get("caption", "説明なし")
                     visualization_info += (
                         f"- 画像{i+1}: {img_ctx['path']} (説明: {caption})\n"
                     )
                     # 文脈情報の一部も提供（長すぎる場合は省略）
-                    context = img_ctx.get('context', '')
+                    context = img_ctx.get("context", "")
                     if context and len(context) > 100:
                         context = context[:100] + "..."
                     if context:
                         visualization_info += f"  文脈: {context}\n"
 
-        return f'''
+        return f"""
 必要な情報はユーザーが提供します。
 マークダウン形式のレポートを作成してください。
 {output_instruction}
@@ -401,7 +401,7 @@ class ReportBuilder:
 * 画像やグラフを使用する際は、その意味や目的を明確に説明し、本文との関連性を示してください
 * 文脈付き画像を使用する場合は、提供されている文脈情報を活用して、画像の意味や重要性を説明してください
 {visualization_info}
-'''
+"""
 
     def _get_default_css(self) -> str:
         """デフォルトのCSSスタイルを取得"""
@@ -579,7 +579,7 @@ class ReportBuilder:
         Returns:
             str: 保存したファイルのパス
         """
-        current_time = datetime.now().strftime('%Y年%m月%d日 %H:%M')
+        current_time = datetime.now().strftime("%Y年%m月%d日 %H:%M")
 
         # 画像ディレクトリへの相対パスを取得
         image_rel_path = os.path.basename(image_dir)
@@ -590,7 +590,7 @@ class ReportBuilder:
 
 {markdown_text}
 """
-        with open(output_path, 'w', encoding='utf-8') as f:
+        with open(output_path, "w", encoding="utf-8") as f:
             f.write(markdown_content)
         return output_path
 
@@ -611,9 +611,9 @@ class ReportBuilder:
         """
         # Use markdown2 with extras, but without link-patterns
         html_content = markdown2.markdown(
-            markdown_text, extras=['tables', 'fenced-code-blocks']
+            markdown_text, extras=["tables", "fenced-code-blocks"]
         )
-        current_time = datetime.now().strftime('%Y年%m月%d日 %H:%M')
+        current_time = datetime.now().strftime("%Y年%m月%d日 %H:%M")
 
         # 画像ディレクトリへの相対パスを取得
         image_rel_path = os.path.basename(image_dir)
@@ -641,7 +641,7 @@ class ReportBuilder:
         </html>
         """
 
-        with open(output_path, 'w', encoding='utf-8') as f:
+        with open(output_path, "w", encoding="utf-8") as f:
             f.write(html_document)
         return output_path
 
@@ -663,7 +663,7 @@ class ReportBuilder:
             pdf = html.write_pdf()
 
             # PDFファイルを保存
-            with open(output_path, 'wb') as f:
+            with open(output_path, "wb") as f:
                 f.write(pdf)
 
             return output_path

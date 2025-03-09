@@ -47,7 +47,7 @@ class ResearchManager:
         self.tool_handler = ToolHandler(logger, base_filename)
         self.data_collector = DataCollector(self.model, self.tool_handler, logger)
         self.report_builder = ReportBuilder(self.model, logger, base_filename)
-        self.conversation = {'A': [], 'I': [], 'F': []}
+        self.conversation = {"A": [], "I": [], "F": []}
         self.source_manager = SourceReferenceManager()
         self.mode = "standard"  # デフォルトは標準モード
         self.current_image_dir = None
@@ -142,8 +142,8 @@ class ResearchManager:
         self.logger.log("目的: コンテキスト情報の収集")
 
         pre_research_prompt = self._create_pre_research_prompt(user_prompt)
-        self.conversation['F'] = []
-        self.conversation['F'].append(
+        self.conversation["F"] = []
+        self.conversation["F"].append(
             {"role": "user", "content": [{"text": pre_research_prompt}]}
         )
 
@@ -200,12 +200,12 @@ class ResearchManager:
         strategy_prompt = self._create_strategy_prompt(user_prompt)
         strategy_response = self.model.generate_response(
             MODEL_CONFIG[PRIMARY_MODEL],
-            self.conversation['A'],
+            self.conversation["A"],
             strategy_prompt,
-            {'temperature': 0},
+            {"temperature": 0},
         )
 
-        strategy_text = strategy_response['output']['message']['content'][0]['text']
+        strategy_text = strategy_response["output"]["message"]["content"][0]["text"]
         self.logger.log("調査戦略:")
         self.logger.log(strategy_text)
 
@@ -232,10 +232,10 @@ class ResearchManager:
         self.logger.log("目的: データの可視化と視覚的情報の準備")
 
         visualization_data = {
-            'graphs': [],
-            'tables': [],
-            'mermaid_diagrams': [],
-            'images_with_context': [],  # 画像とその文脈情報を保存する新しいフィールド
+            "graphs": [],
+            "tables": [],
+            "mermaid_diagrams": [],
+            "images_with_context": [],  # 画像とその文脈情報を保存する新しいフィールド
         }
 
         # 収集したデータを結合
@@ -257,11 +257,11 @@ class ResearchManager:
 
                 try:
                     result_data = json.loads(result)
-                    if 'mermaid_path' in result_data:
+                    if "mermaid_path" in result_data:
                         self.logger.log(
                             f"Mermaid図をレンダリングしました: {result_data['mermaid_path']}"
                         )
-                        visualization_data['mermaid_diagrams'].append(result_data)
+                        visualization_data["mermaid_diagrams"].append(result_data)
                 except:
                     self.logger.log("Mermaid図のレンダリング結果の解析に失敗しました")
 
@@ -278,11 +278,11 @@ class ResearchManager:
 
                     try:
                         result_data = json.loads(result)
-                        if 'mermaid_path' in result_data:
+                        if "mermaid_path" in result_data:
                             self.logger.log(
                                 f"Mermaid図をレンダリングしました: {result_data['mermaid_path']}"
                             )
-                            visualization_data['mermaid_diagrams'].append(result_data)
+                            visualization_data["mermaid_diagrams"].append(result_data)
                     except:
                         self.logger.log(
                             "Mermaid図のレンダリング結果の解析に失敗しました"
@@ -450,15 +450,15 @@ JSON形式で視覚化計画を出力してください。以下は出力形式�
 """
                 }
             ],
-            {'temperature': 0},
+            {"temperature": 0},
             TOOL_CONFIG,
         )
 
         # AIの思考プロセスを出力
         self.logger.log("AI の視覚化計画:")
-        for content in response['output']['message']['content']:
-            if 'text' in content:
-                self.logger.log(content['text'])
+        for content in response["output"]["message"]["content"]:
+            if "text" in content:
+                self.logger.log(content["text"])
         self.logger.log("")
 
         # ツール使用の処理
@@ -472,34 +472,34 @@ JSON形式で視覚化計画を出力してください。以下は出力形式�
         # アシスタントメッセージを追加
         visualization_conversation.append(
             {
-                'role': 'assistant',
-                'content': response['output']['message']['content'],
+                "role": "assistant",
+                "content": response["output"]["message"]["content"],
             }
         )
 
         # グラフ生成ツールの使用を処理
-        if tool_use['name'] == 'generate_graph':
-            result = self.tool_handler.generate_graph(**tool_use['input'])
+        if tool_use["name"] == "generate_graph":
+            result = self.tool_handler.generate_graph(**tool_use["input"])
 
             try:
                 result_data = json.loads(result)
-                if 'graph_path' in result_data:
+                if "graph_path" in result_data:
                     self.logger.log(
                         f"グラフを生成しました: {result_data['graph_path']}"
                     )
-                    visualization_data['graphs'].append(result_data)
+                    visualization_data["graphs"].append(result_data)
             except:
                 self.logger.log("グラフ生成結果の解析に失敗しました")
 
             # ツール結果を追加
             visualization_conversation.append(
                 {
-                    'role': 'user',
-                    'content': [
+                    "role": "user",
+                    "content": [
                         {
-                            'toolResult': {
-                                'toolUseId': tool_use['toolUseId'],
-                                'content': [{'text': result}],
+                            "toolResult": {
+                                "toolUseId": tool_use["toolUseId"],
+                                "content": [{"text": result}],
                             }
                         }
                     ],
@@ -516,41 +516,41 @@ JSON形式で視覚化計画を出力してください。以下は出力形式�
                             "text": "他にも視覚化できるデータがあれば、グラフを生成してください。特に時系列データ、比較データ、割合データなど、グラフ化に適したデータを探してください。"
                         }
                     ],
-                    {'temperature': 0},
+                    {"temperature": 0},
                     TOOL_CONFIG,
                 )
 
                 tool_use = self.tool_handler.process_tool_response(response)
-                if not tool_use or tool_use['name'] != 'generate_graph':
+                if not tool_use or tool_use["name"] != "generate_graph":
                     break
 
                 visualization_conversation.append(
                     {
-                        'role': 'assistant',
-                        'content': response['output']['message']['content'],
+                        "role": "assistant",
+                        "content": response["output"]["message"]["content"],
                     }
                 )
 
-                result = self.tool_handler.generate_graph(**tool_use['input'])
+                result = self.tool_handler.generate_graph(**tool_use["input"])
 
                 try:
                     result_data = json.loads(result)
-                    if 'graph_path' in result_data:
+                    if "graph_path" in result_data:
                         self.logger.log(
                             f"追加のグラフを生成しました: {result_data['graph_path']}"
                         )
-                        visualization_data['graphs'].append(result_data)
+                        visualization_data["graphs"].append(result_data)
                 except:
                     self.logger.log("追加のグラフ生成結果の解析に失敗しました")
 
                 visualization_conversation.append(
                     {
-                        'role': 'user',
-                        'content': [
+                        "role": "user",
+                        "content": [
                             {
-                                'toolResult': {
-                                    'toolUseId': tool_use['toolUseId'],
-                                    'content': [{'text': result}],
+                                "toolResult": {
+                                    "toolUseId": tool_use["toolUseId"],
+                                    "content": [{"text": result}],
                                 }
                             }
                         ],
@@ -560,7 +560,7 @@ JSON形式で視覚化計画を出力してください。以下は出力形式�
         # 表データの抽出
         tables = self._extract_tables_from_data(combined_data)
         if tables:
-            visualization_data['tables'] = tables
+            visualization_data["tables"] = tables
             self.logger.log(f"{len(tables)} 個の表データを抽出しました")
 
         self.logger.log(
@@ -581,7 +581,7 @@ JSON形式で視覚化計画を出力してください。以下は出力形式�
         for data_item in collected_data:
             # 画像パスを検索
             image_paths = re.findall(
-                r'([^/\s]+_images/[^)\s]+\.(png|jpg|jpeg|gif))', data_item
+                r"([^/\s]+_images/[^)\s]+\.(png|jpg|jpeg|gif))", data_item
             )
 
             for img_path_tuple in image_paths:
@@ -598,15 +598,15 @@ JSON形式で視覚化計画を出力してください。以下は出力形式�
                     # 画像の説明を抽出（キャプションらしき部分）
                     caption = ""
                     caption_match = re.search(
-                        r'(?:図|画像|イメージ|Figure)[:：]?\s*([^\n.。]+)[.。]?',
+                        r"(?:図|画像|イメージ|Figure)[:：]?\s*([^\n.。]+)[.。]?",
                         context,
                     )
                     if caption_match:
                         caption = caption_match.group(1).strip()
 
                     # 画像と文脈情報を保存
-                    visualization_data['images_with_context'].append(
-                        {'path': img_path, 'context': context, 'caption': caption}
+                    visualization_data["images_with_context"].append(
+                        {"path": img_path, "context": context, "caption": caption}
                     )
 
                     self.logger.log(f"画像の文脈情報を抽出しました: {img_path}")
@@ -628,7 +628,7 @@ JSON形式で視覚化計画を出力してください。以下は出力形式�
         self.logger.log("視覚化計画の作成を開始します")
 
         # 視覚化計画作成のためのプロンプト
-        planning_prompt = f'''<title>
+        planning_prompt = f"""<title>
 {user_prompt}
 </title>
 <strategy>
@@ -636,7 +636,7 @@ JSON形式で視覚化計画を出力してください。以下は出力形式�
 </strategy>
 <data>
 {data[:5000]}
-</data>'''
+</data>"""
 
         # 会話履歴の初期化
         planning_conversation = []
@@ -779,19 +779,19 @@ JSON形式で視覚化計画を出力してください。以下は出力形式�
 視覚化計画を作成してください。"""
                 }
             ],
-            {'temperature': 0.2},  # 少し創造性を持たせる
+            {"temperature": 0.2},  # 少し創造性を持たせる
         )
 
         self.logger.log(f"AIの視覚化計画：{response}")
 
         # AIの回答からJSON部分を抽出
         plan_text = ""
-        for content in response['output']['message']['content']:
-            if 'text' in content:
-                plan_text += content['text']
+        for content in response["output"]["message"]["content"]:
+            if "text" in content:
+                plan_text += content["text"]
 
         # JSON部分を抽出
-        json_match = re.search(r'```json\s*(.*?)\s*```', plan_text, re.DOTALL)
+        json_match = re.search(r"```json\s*(.*?)\s*```", plan_text, re.DOTALL)
         if json_match:
             json_str = json_match.group(1)
             try:
@@ -804,7 +804,7 @@ JSON形式で視覚化計画を出力してください。以下は出力形式�
             # JSON形式でない場合は全体をパースしてみる
             try:
                 # 波括弧で囲まれた部分を探す
-                json_match = re.search(r'\{.*\}', plan_text, re.DOTALL)
+                json_match = re.search(r"\{.*\}", plan_text, re.DOTALL)
                 if json_match:
                     json_str = json_match.group(0)
                     plan = json.loads(json_str)
@@ -827,17 +827,17 @@ JSON形式で視覚化計画を出力してください。以下は出力形式�
             visualization_data: 視覚化データ辞書（更新される）
             data: 収集したデータ
         """
-        if 'visualizations' not in plan:
+        if "visualizations" not in plan:
             self.logger.log("視覚化計画に 'visualizations' キーがありません")
             return
 
-        for viz in plan['visualizations']:
+        for viz in plan["visualizations"]:
             try:
-                viz_type = viz.get('type', '')
+                viz_type = viz.get("type", "")
 
-                if viz_type == 'graph':
+                if viz_type == "graph":
                     self._generate_graph_from_plan(viz, visualization_data, data)
-                elif viz_type == 'mermaid':
+                elif viz_type == "mermaid":
                     self._generate_mermaid_from_plan(viz, visualization_data, data)
                 else:
                     self.logger.log(f"不明な視覚化タイプ: {viz_type}、スキップします")
@@ -857,25 +857,25 @@ JSON形式で視覚化計画を出力してください。以下は出力形式�
             data: 収集したデータ
         """
         try:
-            graph_type = viz.get('graph_type', '')
-            title = viz.get('title', '')
-            purpose = viz.get('purpose', '')
-            data_needed = viz.get('data_needed', '')
-            x_label = viz.get('x_label', '')
-            y_label = viz.get('y_label', '')
+            graph_type = viz.get("graph_type", "")
+            title = viz.get("title", "")
+            purpose = viz.get("purpose", "")
+            data_needed = viz.get("data_needed", "")
+            x_label = viz.get("x_label", "")
+            y_label = viz.get("y_label", "")
 
             if not graph_type or not title:
                 self.logger.log("グラフタイプまたはタイトルが指定されていません")
                 return
 
             # データ抽出のためのプロンプト
-            data_extraction_prompt = f'''<title>{title}</title>
+            data_extraction_prompt = f"""<title>{title}</title>
 <graph-type>{graph_type}</graph-type>
 <purpose>{purpose}</purpose>
 <data-needed>{data_needed}</data-needed>
 <x-label>{x_label}</x-label>
 <y-label>{y_label}</y-label>
-<data>{data[:10000]}</data>'''
+<data>{data[:10000]}</data>"""
 
             # 会話履歴の初期化
             extraction_conversation = []
@@ -889,7 +889,7 @@ JSON形式で視覚化計画を出力してください。以下は出力形式�
                 extraction_conversation,
                 [
                     {
-                        "text": '''あなたはデータ抽出の専門家です。
+                        "text": """あなたはデータ抽出の専門家です。
 ユーザーは <title> でグラフのタイトルを、<graph-type> でグラフ種類を、<purpose> でグラフの目的を、<data_needed> で必要なデータを、<x-label> で X 軸のラベルを、<y-label> で Y 軸のラベルを、<data> でデータを与えます。
 以下の JSON 形式でデータを出力してください。
 ```json
@@ -901,58 +901,58 @@ JSON形式で視覚化計画を出力してください。以下は出力形式�
 }
 ```
 ただし、データが見つからない場合は空の JSON を返してください。
-出力は ```json から始め ``` で必ず終えてください。'''
+出力は ```json から始め ``` で必ず終えてください。"""
                     }
                 ],
-                {'temperature': 0},
+                {"temperature": 0},
             )
 
             # AIの回答からJSON部分を抽出
             extraction_text = ""
-            for content in response['output']['message']['content']:
-                if 'text' in content:
-                    extraction_text += content['text']
+            for content in response["output"]["message"]["content"]:
+                if "text" in content:
+                    extraction_text += content["text"]
 
             # JSON部分を抽出
-            json_match = re.search(r'```json\s*(.*?)\s*```', extraction_text, re.DOTALL)
+            json_match = re.search(r"```json\s*(.*?)\s*```", extraction_text, re.DOTALL)
             if json_match:
                 json_str = json_match.group(1)
                 try:
                     extracted_data = json.loads(json_str)
 
                     # 抽出したデータでグラフを生成
-                    if 'labels' in extracted_data and (
-                        'data' in extracted_data or 'multi_data' in extracted_data
+                    if "labels" in extracted_data and (
+                        "data" in extracted_data or "multi_data" in extracted_data
                     ):
                         graph_params = {
-                            'graph_type': graph_type,
-                            'title': title,
-                            'x_label': x_label,
-                            'y_label': y_label,
-                            'labels': extracted_data.get('labels', []),
+                            "graph_type": graph_type,
+                            "title": title,
+                            "x_label": x_label,
+                            "y_label": y_label,
+                            "labels": extracted_data.get("labels", []),
                         }
 
                         # 単一系列か複数系列かを判断
                         if (
-                            'multi_data' in extracted_data
-                            and 'series_labels' in extracted_data
+                            "multi_data" in extracted_data
+                            and "series_labels" in extracted_data
                         ):
-                            graph_params['multi_data'] = extracted_data['multi_data']
-                            graph_params['series_labels'] = extracted_data[
-                                'series_labels'
+                            graph_params["multi_data"] = extracted_data["multi_data"]
+                            graph_params["series_labels"] = extracted_data[
+                                "series_labels"
                             ]
-                        elif 'data' in extracted_data:
-                            graph_params['data'] = extracted_data['data']
+                        elif "data" in extracted_data:
+                            graph_params["data"] = extracted_data["data"]
 
                         # グラフ生成
                         result = self.tool_handler.generate_graph(**graph_params)
 
                         try:
                             result_data = json.loads(result)
-                            if 'graph_path' in result_data:
+                            if "graph_path" in result_data:
                                 # 目的情報を追加
-                                result_data['purpose'] = purpose
-                                visualization_data['graphs'].append(result_data)
+                                result_data["purpose"] = purpose
+                                visualization_data["graphs"].append(result_data)
                                 self.logger.log(
                                     f"計画に基づいてグラフを生成しました: {result_data['graph_path']}"
                                 )
@@ -977,26 +977,26 @@ JSON形式で視覚化計画を出力してください。以下は出力形式�
         """
         try:
             # 必要なパラメータを取得（存在しない場合はデフォルト値を使用）
-            diagram_type = ''
-            if 'diagram_type' in viz:
-                diagram_type = viz['diagram_type']
-            elif 'graph_type' in viz:
-                diagram_type = viz['graph_type']
-            title = viz.get('title', 'Mermaid Diagram')
-            purpose = viz.get('purpose', '')
-            description = viz.get('description', '')
+            diagram_type = ""
+            if "diagram_type" in viz:
+                diagram_type = viz["diagram_type"]
+            elif "graph_type" in viz:
+                diagram_type = viz["graph_type"]
+            title = viz.get("title", "Mermaid Diagram")
+            purpose = viz.get("purpose", "")
+            description = viz.get("description", "")
 
             if not diagram_type:
                 self.logger.log(f"Mermaid図のタイプが指定されていません:{viz}")
                 return
 
             # Mermaid図生成のためのプロンプト
-            mermaid_prompt = f'''<title>{title}</title>
+            mermaid_prompt = f"""<title>{title}</title>
 <diagram-type>{diagram_type}</diagram-type>
 <purpose>{purpose}</purpose>
 <description>{description}</description>
 <data>{data[:5000]}</data>
-'''
+"""
 
             # 会話履歴の初期化
             mermaid_conversation = []
@@ -1010,7 +1010,7 @@ JSON形式で視覚化計画を出力してください。以下は出力形式�
                 mermaid_conversation,
                 [
                     {
-                        "text": '''あなたは Mermaid 図の専門家です。ユーザーが <title> タグで与える Mermaid 図を作成してください。
+                        "text": """あなたは Mermaid 図の専門家です。ユーザーが <title> タグで与える Mermaid 図を作成してください。
 図の種類は <diagram-type> タグで、目的は <purpose> タグで、説明は <description> タグで、データは <data> タグで、それぞれユーザーが与えます。
 ただし <rules> で与えるルールを遵守してください。
 <rules>
@@ -1020,21 +1020,21 @@ JSON形式で視覚化計画を出力してください。以下は出力形式�
 * 複雑すぎず、シンプルで理解しやすいこと
 * 図の目的に沿っていること
 <rules>
-コードの前後に```mermaidや```などのマークダウン記法は不要です。Mermaid図のコードのみを出力してください。'''
+コードの前後に```mermaidや```などのマークダウン記法は不要です。Mermaid図のコードのみを出力してください。"""
                     }
                 ],
-                {'temperature': 0.2},  # 少し創造性を持たせる
+                {"temperature": 0.2},  # 少し創造性を持たせる
             )
 
             # AIの回答からMermaidコードを抽出
             mermaid_text = ""
-            for content in response['output']['message']['content']:
-                if 'text' in content:
-                    mermaid_text += content['text']
+            for content in response["output"]["message"]["content"]:
+                if "text" in content:
+                    mermaid_text += content["text"]
 
             # Mermaidコードを抽出（マークダウンコードブロックがある場合とない場合の両方に対応）
             mermaid_match = re.search(
-                r'```mermaid\s*(.*?)\s*```', mermaid_text, re.DOTALL
+                r"```mermaid\s*(.*?)\s*```", mermaid_text, re.DOTALL
             )
             if mermaid_match:
                 mermaid_code = mermaid_match.group(1)
@@ -1047,10 +1047,10 @@ JSON形式で視覚化計画を出力してください。以下は出力形式�
 
             try:
                 result_data = json.loads(result)
-                if 'mermaid_path' in result_data:
+                if "mermaid_path" in result_data:
                     # 目的情報を追加
-                    result_data['purpose'] = purpose
-                    visualization_data['mermaid_diagrams'].append(result_data)
+                    result_data["purpose"] = purpose
+                    visualization_data["mermaid_diagrams"].append(result_data)
                     self.logger.log(
                         f"計画に基づいてMermaid図を生成しました: {result_data['mermaid_path']}"
                     )
@@ -1073,7 +1073,7 @@ JSON形式で視覚化計画を出力してください。以下は出力形式�
 
         # マークダウン形式の表を検出
         markdown_tables = re.findall(
-            r'(\|[^\n]+\|\n\|[-:| ]+\|\n(?:\|[^\n]+\|\n)+)', data
+            r"(\|[^\n]+\|\n\|[-:| ]+\|\n(?:\|[^\n]+\|\n)+)", data
         )
 
         for i, table in enumerate(markdown_tables):
@@ -1083,19 +1083,19 @@ JSON形式で視覚化計画を出力してください。以下は出力形式�
             if table_pos > 0:
                 # 表の前の行を取得
                 prev_text = data[:table_pos].strip()
-                last_line = prev_text.split('\n')[-1]
+                last_line = prev_text.split("\n")[-1]
                 # 行が短く、「表」や「一覧」などの単語を含む場合はタイトルとして使用
                 if len(last_line) < 50 and (
-                    '表' in last_line or '一覧' in last_line or 'リスト' in last_line
+                    "表" in last_line or "一覧" in last_line or "リスト" in last_line
                 ):
                     title = last_line
 
             tables.append(
                 {
-                    'type': 'markdown',
-                    'content': table,
-                    'id': f'table_{i+1}',
-                    'title': title,
+                    "type": "markdown",
+                    "content": table,
+                    "id": f"table_{i+1}",
+                    "title": title,
                 }
             )
 
@@ -1115,7 +1115,7 @@ JSON形式で視覚化計画を出力してください。以下は出力形式�
         Returns:
             str: 視覚化プロンプト
         """
-        return f'''<title>
+        return f"""<title>
 {user_prompt}
 </title>
 <strategy>
@@ -1123,28 +1123,28 @@ JSON形式で視覚化計画を出力してください。以下は出力形式�
 </strategy>
 <data>
 {data[:10000]}  # データが長い場合は一部を使用
-</data>'''
+</data>"""
 
     def _initialize_conversation(self, user_prompt: str, pre_research_data: str):
         """会話の初期化"""
-        self.conversation['A'] = [
+        self.conversation["A"] = [
             {
                 "role": "user",
                 "content": [
                     {
-                        "text": f'''今回のトピックと事前調査結果は以下の通りです。
+                        "text": f"""今回のトピックと事前調査結果は以下の通りです。
 <topic>
 {user_prompt}
 </topic>
 <pre-research>
 {pre_research_data}
 <pre-research>
-一緒に調査内容を検討しましょう。よろしくお願いします。まずは何かアイデアはありますか？'''
+一緒に調査内容を検討しましょう。よろしくお願いします。まずは何かアイデアはありますか？"""
                     }
                 ],
             }
         ]
-        self.conversation['I'] = []
+        self.conversation["I"] = []
 
     def _conduct_conversation(self, system_prompt: List[Dict], max_turns: int):
         """AIモデル間の会話を実行"""
@@ -1153,15 +1153,15 @@ JSON形式で視覚化計画を出力してください。以下は出力形式�
 
             # Primary AIの応答
             primary_response = self._get_model_response(
-                PRIMARY_MODEL, self.conversation['A'], system_prompt
+                PRIMARY_MODEL, self.conversation["A"], system_prompt
             )
-            self._update_conversation(primary_response, 'A', 'I')
+            self._update_conversation(primary_response, "A", "I")
 
             # Secondary AIの応答
             secondary_response = self._get_model_response(
-                SECONDARY_MODEL, self.conversation['I'], system_prompt
+                SECONDARY_MODEL, self.conversation["I"], system_prompt
             )
-            self._update_conversation(secondary_response, 'I', 'A')
+            self._update_conversation(secondary_response, "I", "A")
 
     def _get_model_response(
         self, model_name: str, messages: List[Dict], system_prompt: List[Dict]
@@ -1172,9 +1172,9 @@ JSON形式で視覚化計画を出力してください。以下は出力形式�
             MODEL_CONFIG[model_name],
             messages,
             system_prompt,
-            {'temperature': 1},
+            {"temperature": 1},
         )
-        response_text = response['output']['message']['content'][0]['text']
+        response_text = response["output"]["message"]["content"][0]["text"]
         self.logger.log(response_text)
         return response_text
 
@@ -1202,7 +1202,7 @@ JSON形式で視覚化計画を出力してください。以下は出力形式�
 
         return [
             {
-                'text': f'''あなたは優秀なリサーチャーです。
+                "text": f"""あなたは優秀なリサーチャーです。
 会話相手はあなたと同じ調査内容で依頼を受けている同僚の AI さんです。
 最初に <topic> タグで調査のトピックを、<pre-research> タグで事前の調査内容が与えらます。
 調査内容はキーワードや意味の列挙なので、調査の粒度や観点などは仮説を持って調査をした後調査結果を作成し、調査結果のフィードバックをもらうことでしか改善できません。
@@ -1222,7 +1222,7 @@ AI さんはあなたの思考の枠を外して広い視野を提供してく�
 * 説明をよりわかりやすく整理するために mermaid 形式を必要に応じて利用し、sequence / class / er diagram / mindmap / pie / gantt / quadrant / gitgraph / timeline / sankey-beta / architecture-beta などを議論上の整理に用いてください。
 </rules>
 また、発言する際は最初に必ず x 回目の発言です、と言ってください。発言回数は自分の発言回数であり、相手の発言はカウントしてはいけません。
-'''
+"""
             }
         ]
 
@@ -1230,7 +1230,7 @@ AI さんはあなたの思考の枠を外して広い視野を提供してく�
         """戦略プロンプトの作成"""
         return [
             {
-                'text': f'''あなたは優秀なリサーチャーです。
+                "text": f"""あなたは優秀なリサーチャーです。
 あなたは「{user_prompt}」 という調査依頼を受けとっています。
 調査内容は雑なので、調査の粒度や観点などは仮説を持って調査をした後調査結果を作成し、調査結果のフィードバックをもらうことでしか改善できません。
 どのように調査を進めるかの方針をまとめた会話を渡します。
@@ -1242,22 +1242,22 @@ AI さんはあなたの思考の枠を外して広い視野を提供してく�
 2. どのようなツール（Web検索、コンテンツ取得、画像検索と画像取得、グラフ画像作成など）を使用するか
 3. 収集した情報をどのように整理・分析するか。必要に応じて、あるいはグラフ画像を作成が有効か
 4. 最終的なレポートにどのような視覚的要素（画像取得ツールでダウンロードした画像、グラフ画像作成ツールで生成した画像）を含めるか
-'''
+"""
             }
         ]
 
     def _extract_conversation_text(self) -> str:
         """会話履歴からテキストを抽出"""
         extracted_text = ""
-        for c in self.conversation['F']:
-            if 'content' in c:
-                for item in c['content']:
-                    if 'text' in item:
-                        extracted_text += item['text'] + "\n\n"
-                    elif 'toolResult' in item and 'content' in item['toolResult']:
-                        for content_item in item['toolResult']['content']:
-                            if 'text' in content_item:
-                                extracted_text += content_item['text'] + "\n\n"
+        for c in self.conversation["F"]:
+            if "content" in c:
+                for item in c["content"]:
+                    if "text" in item:
+                        extracted_text += item["text"] + "\n\n"
+                    elif "toolResult" in item and "content" in item["toolResult"]:
+                        for content_item in item["toolResult"]["content"]:
+                            if "text" in content_item:
+                                extracted_text += content_item["text"] + "\n\n"
         return extracted_text
 
     def _log_research_summary(self, research_text: str):
