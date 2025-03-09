@@ -32,8 +32,12 @@ def main():
     """
     parser = argparse.ArgumentParser(description='AI Research Assistant')
     parser.add_argument('--prompt', required=True, help='Research prompt/question')
-    parser.add_argument('--mode', choices=['standard', 'summary'], default='standard',
-                      help='Research mode: standard (default) or summary')
+    parser.add_argument(
+        '--mode',
+        choices=['standard', 'summary'],
+        default='standard',
+        help='Research mode: standard (default) or summary',
+    )
     args = parser.parse_args()
 
     # Initialize logger
@@ -47,16 +51,17 @@ def main():
         # ファイル名の生成
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
         base_filename = os.path.join(output_dir, f"report_{timestamp}")
-        
+
         # 画像ディレクトリの作成
         image_dir = f"{base_filename}_images"
         os.makedirs(image_dir, exist_ok=True)
         logger.log(f"画像ディレクトリを作成しました: {image_dir}")
 
-
         # Initialize and execute research manager
-        research_manager = ResearchManager(logger,base_filename)
-        html_path, md_path, pdf_path = research_manager.execute_research(args.prompt, args.mode)
+        research_manager = ResearchManager(logger, base_filename)
+        html_path, md_path, pdf_path = research_manager.execute_research(
+            args.prompt, args.mode
+        )
 
         logger.log(f"研究が完了しました。(モード: {args.mode})")
         logger.log(f"HTMLレポート: {html_path}")

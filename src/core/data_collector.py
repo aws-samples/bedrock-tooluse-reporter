@@ -22,7 +22,13 @@ from ..models.bedrock import BedrockModel
 from ..models.source_reference import SourceReference, SourceReferenceManager
 from ..utils.tool_handler import ToolHandler
 from ..utils.exceptions import DataCollectionError
-from ..config.settings import MODEL_CONFIG, PRIMARY_MODEL, TOOL_CONFIG, MAX_RESEARCH_SEARCHES, SUMMARY_RESEARCH_SEARCHES
+from ..config.settings import (
+    MODEL_CONFIG,
+    PRIMARY_MODEL,
+    TOOL_CONFIG,
+    MAX_RESEARCH_SEARCHES,
+    SUMMARY_RESEARCH_SEARCHES,
+)
 
 
 class DataCollector:
@@ -80,14 +86,18 @@ class DataCollector:
         self.logger.section("情報収集フェーズ開始")
         self.has_retrieved_image = False  # 画像取得フラグをリセット
 
-        research_prompt = self._create_research_prompt(user_prompt)
+        research_prompt = self._create_research_prompt()
         conversation['F'] = []
         conversation['F'].append({"role": "user", "content": [{"text": strategy_text}]})
 
         # モードに基づいて最大反復回数を決定
         if max_iterations is None:
-            max_iterations = SUMMARY_RESEARCH_SEARCHES if mode == "summary" else MAX_RESEARCH_SEARCHES
-        
+            max_iterations = (
+                SUMMARY_RESEARCH_SEARCHES
+                if mode == "summary"
+                else MAX_RESEARCH_SEARCHES
+            )
+
         self.logger.log(f"情報収集モード: {mode}, 最大反復回数: {max_iterations}")
 
         collected_data = []
@@ -99,7 +109,9 @@ class DataCollector:
                 if not self.has_retrieved_image and i == max_iterations - 1:
                     self.logger.log("画像が取得されていないため、画像検索を促します")
                     image_prompt = self._create_image_search_prompt(user_prompt)
-                    conversation['F'].append({"role": "user", "content": [{"text": image_prompt}]})
+                    conversation['F'].append(
+                        {"role": "user", "content": [{"text": image_prompt}]}
+                    )
 
                 response = self.model.generate_response(
                     MODEL_CONFIG[PRIMARY_MODEL],
@@ -129,7 +141,9 @@ class DataCollector:
                 if tool_use['name'] == 'is_finished':
                     # 画像が取得されていない場合、終了せずに画像検索を促す
                     if not self.has_retrieved_image and i < max_iterations - 1:
-                        self.logger.log("画像が取得されていないため、終了せずに画像検索を促します")
+                        self.logger.log(
+                            "画像が取得されていないため、終了せずに画像検索を促します"
+                        )
                         image_prompt = self._create_image_search_prompt(user_prompt)
                         conversation['F'].append(
                             {
@@ -174,7 +188,9 @@ class DataCollector:
 
             # 最終チェック: 画像が取得されていない場合は強制的に画像検索を実行
             if not self.has_retrieved_image:
-                self.logger.log("最終チェック: 画像が取得されていないため、強制的に画像検索を実行します")
+                self.logger.log(
+                    "最終チェック: 画像が取得されていないため、強制的に画像検索を実行します"
+                )
                 image_result = self._force_image_search(user_prompt)
                 if image_result:
                     collected_data.append(image_result)
@@ -198,45 +214,62 @@ class DataCollector:
         try:
             self.logger.log(f"強制的に画像検索を実行: '{user_prompt}'")
             result = self.tool_handler.image_search(query=user_prompt, max_results=3)
-            
+
             # 結果をJSONとしてパース
             result_data = json.loads(result)
-            
+
             # 画像が取得できたかチェック
             if 'images' in result_data and result_data['images']:
                 self.has_retrieved_image = True
-                self.logger.log(f"強制的な画像検索で {len(result_data['images'])} 枚の画像を取得しました")
+                self.logger.log(
+                    f"強制的な画像検索で {len(result_data['images'])} 枚の画像を取得しました"
+                )
                 return f"強制的な画像検索の結果:\n{result}"
             else:
                 self.logger.log("強制的な画像検索でも画像を取得できませんでした")
                 return None
-                
+
         except Exception as e:
             self.logger.log(f"強制的な画像検索中にエラーが発生しました: {str(e)}")
             return None
 
-    def _create_research_prompt(self, user_prompt: str) -> List[Dict]:
+    def _create_research_prompt(self) -> List[Dict]:
         """研究プロンプトの作成"""
         return [
             {
                 'text': f'''あなたは優秀なリサーチャーです。
-あなたは「{user_prompt}」 という調査依頼を受けとっています。
-ユーザーはレポートのフレームワーク与えます。
-あなたは、Web検索、検索結果のURLへのアクセス、画像検索による画像取得、グラフ画像生成などのツールを使用して情報を取得し、その結果を元に自分自身で考察することができます。
+ユーザーはトピックを提供します。詳細なレポート作成は後段で行うので、まず必要な情報について包括的な調査を徹底的にしてください。
 
-以下のツールを活用してください：
+与えられたトピックについて、<point-of-view> タグで与えた点を明らかにするための情報を収集します。
+また、<tools> で与えたツールのみを使用して粛々と情報収集します。
+<rules> で与えた制約事項は大切なので遵守してください。
+<point-of-view>
+1. 主要な概念や用語の定義
+2. 最新のニュースや画像
+3. 関連する用語や関連するコンテキスト
+4. 関連する最新の動向や傾向や話題
+5. 関連する最新の研究
+6. データポイント
+7. 関連する事例
+</point-of-view>
+<tools>
 1. search: Webで情報を検索する
 2. get_content: URLからコンテンツを取得する
 3. image_search: 関連する画像を検索して取得して保存する
 4. generate_graph: 数値データからグラフ画像（折れ線グラフ・棒グラフ・円グラフ）を生成する
-5. render_mermaid: Mermaid形式の文字列を渡すと図を作成する。Mermaid形式には全て対応しており、Flowchat,Sequence Diagram,Class Diagram, State Diagram, Gantt, Pie chart, Quadrant Chart, Git diagram, Mindmaps, ZenUML, Sankky, XY Chart, Block Diagram, Packet, Kanban, Architecture等が作成できます。
+5. render_mermaid: Mermaid形式の文字列を渡すと図を作成する
 6. is_finished: 情報収集を完了する
+</tools>
+<rules>
+- あなたが賢いのは知っていますが、一旦すべてのバイアスを除去と最新情報を得るために、例え知っているトピックだったとしてもすべての知識を忘れ、与えられたトピックについて貪欲に学んでください。
+- 必ず1つ以上の画像を取得すること
+- 数値データがある場合はグラフ画像を作成すること
+- 視覚的な情報を積極的に活用すること
+- 情報引用時は [※N] の形式で出典を明記すること
+- コンテキストがわからない用語も含めてキーワードに分割して調査すること
+</rules>
 
-特に、以下の点に注意してください：
-- 必ず1つ以上の画像を取得するために、image_searchツールを使用して関連画像を検索・保存してください
-- 数値データを扱う場合は、generate_graphツールを使用してグラフ画像（棒グラフ・折れ線グラフ・円グラフ）を作成して保存しレポートに参照させることを検討してください
-- 視覚的な情報が役立つ場合は、image_searchツールを使用して関連画像を取得して保存し、レポートに参照させることを検討してください
-- 情報を引用する際は、必ず引用元を [※N] の形式で明記してください
+ユーザーがトピックを与えたら調査を開始してください。
 '''
             }
         ]
@@ -272,11 +305,11 @@ image_searchツールを使用して、関連する画像を少なくとも1つ�
 
         result = None
         citation = None
-        
+
         if tool_use['name'] == 'search':
             result = self.tool_handler.search(**tool_use['input'])
             self.logger.log("\n検索結果:")
-            
+
         elif tool_use['name'] == 'get_content':
             result, title = self.tool_handler.get_content(**tool_use['input'])
             if result:
@@ -290,7 +323,7 @@ image_searchツールを使用して、関連する画像を少なくとも1つ�
                     )
                 )
             self.logger.log("\nコンテンツ取得結果:")
-            
+
         elif tool_use['name'] == 'image_search':
             # 画像ディレクトリが設定されていることを確認
             if self.current_image_dir:
@@ -300,7 +333,9 @@ image_searchツールを使用して、関連する画像を少なくとも1つ�
                     result_data = json.loads(result)
                     if 'images' in result_data and result_data['images']:
                         self.has_retrieved_image = True
-                        self.logger.log(f"\n画像検索結果: {len(result_data['images'])} 枚の画像を取得しました")
+                        self.logger.log(
+                            f"\n画像検索結果: {len(result_data['images'])} 枚の画像を取得しました"
+                        )
                     else:
                         self.logger.log("\n画像検索結果: 画像を取得できませんでした")
                 except:
@@ -308,7 +343,7 @@ image_searchツールを使用して、関連する画像を少なくとも1つ�
             else:
                 result = '{"error": "画像ディレクトリが設定されていません"}'
                 self.logger.log("\n画像ディレクトリが設定されていません")
-                
+
         elif tool_use['name'] == 'generate_graph':
             # 画像ディレクトリが設定されていることを確認
             if self.current_image_dir:

@@ -44,7 +44,7 @@ class ResearchManager:
         """
         self.logger = logger
         self.model = BedrockModel(logger)
-        self.tool_handler = ToolHandler(logger,base_filename)
+        self.tool_handler = ToolHandler(logger, base_filename)
         self.data_collector = DataCollector(self.model, self.tool_handler, logger)
         self.report_builder = ReportBuilder(self.model, logger, base_filename)
         self.conversation = {'A': [], 'I': [], 'F': []}
@@ -53,7 +53,9 @@ class ResearchManager:
         self.current_image_dir = None
         self.basefilename = base_filename
 
-    def execute_research(self, user_prompt: str, mode: str = "standard") -> Tuple[str, str, str]:
+    def execute_research(
+        self, user_prompt: str, mode: str = "standard"
+    ) -> Tuple[str, str, str]:
         """
         研究プロセスの実行
 
@@ -71,7 +73,7 @@ class ResearchManager:
             self.mode = mode.lower()
             if self.mode not in ["standard", "summary"]:
                 self.mode = "standard"  # 不明なモードの場合はデフォルトに設定
-                
+
             self.logger.section(f"リサーチ開始: {user_prompt} (モード: {self.mode})")
 
             # 画像ディレクトリを取得して設定
@@ -98,9 +100,7 @@ class ResearchManager:
 
             # レポート事前準備（データの可視化）
             visualization_data = self._prepare_report_visualizations(
-                collected_data,
-                user_prompt,
-                strategy_text
+                collected_data, user_prompt, strategy_text
             )
 
             # 収集データの整理
@@ -122,7 +122,7 @@ class ResearchManager:
                 final_report,
                 f"調査レポート: {user_prompt}",
             )
-            
+
             return html_path, md_path, pdf_path
 
         except Exception as e:
@@ -148,8 +148,12 @@ class ResearchManager:
         )
 
         # モードに応じた最大検索回数を設定
-        max_searches = SUMMARY_PRE_RESEARCH_SEARCHES if self.mode == "summary" else MAX_PRE_RESEARCH_SEARCHES
-        
+        max_searches = (
+            SUMMARY_PRE_RESEARCH_SEARCHES
+            if self.mode == "summary"
+            else MAX_PRE_RESEARCH_SEARCHES
+        )
+
         collected_data, source_manager = self.data_collector.collect_research_data(
             self.conversation,
             pre_research_prompt,
@@ -183,12 +187,14 @@ class ResearchManager:
         self.logger.log("目的: 調査方針の検討と決定")
 
         self._initialize_conversation(user_prompt, pre_research_data)
-        qualification_prompt = self._create_qualification_prompt(
-            user_prompt, pre_research_data
-        )
-        
+        qualification_prompt = self._create_qualification_prompt()
+
         # モードに応じた最大会話ターン数を設定
-        max_turns = SUMMARY_CONVERSATION_TURNS if self.mode == "summary" else MAX_CONVERSATION_TURNS
+        max_turns = (
+            SUMMARY_CONVERSATION_TURNS
+            if self.mode == "summary"
+            else MAX_CONVERSATION_TURNS
+        )
         self._conduct_conversation(qualification_prompt, max_turns)
 
         strategy_prompt = self._create_strategy_prompt(user_prompt)
@@ -229,7 +235,7 @@ class ResearchManager:
             'graphs': [],
             'tables': [],
             'mermaid_diagrams': [],
-            'images_with_context': []  # 画像とその文脈情報を保存する新しいフィールド
+            'images_with_context': [],  # 画像とその文脈情報を保存する新しいフィールド
         }
 
         # 収集したデータを結合
@@ -242,15 +248,19 @@ class ResearchManager:
         # 調査戦略からMermaid図を抽出
         strategy_diagrams = self.tool_handler.extract_mermaid_diagrams(strategy_text)
         if strategy_diagrams:
-            self.logger.log(f"調査戦略から {len(strategy_diagrams)} 個のMermaid図を抽出しました")
-            
+            self.logger.log(
+                f"調査戦略から {len(strategy_diagrams)} 個のMermaid図を抽出しました"
+            )
+
             for title, mermaid_code in strategy_diagrams:
                 result = self.tool_handler.render_mermaid(mermaid_code, title)
-                
+
                 try:
                     result_data = json.loads(result)
                     if 'mermaid_path' in result_data:
-                        self.logger.log(f"Mermaid図をレンダリングしました: {result_data['mermaid_path']}")
+                        self.logger.log(
+                            f"Mermaid図をレンダリングしました: {result_data['mermaid_path']}"
+                        )
                         visualization_data['mermaid_diagrams'].append(result_data)
                 except:
                     self.logger.log("Mermaid図のレンダリング結果の解析に失敗しました")
@@ -259,32 +269,44 @@ class ResearchManager:
         for data_item in collected_data:
             diagrams = self.tool_handler.extract_mermaid_diagrams(data_item)
             if diagrams:
-                self.logger.log(f"収集データから {len(diagrams)} 個のMermaid図を抽出しました")
-                
+                self.logger.log(
+                    f"収集データから {len(diagrams)} 個のMermaid図を抽出しました"
+                )
+
                 for title, mermaid_code in diagrams:
                     result = self.tool_handler.render_mermaid(mermaid_code, title)
-                    
+
                     try:
                         result_data = json.loads(result)
                         if 'mermaid_path' in result_data:
-                            self.logger.log(f"Mermaid図をレンダリングしました: {result_data['mermaid_path']}")
+                            self.logger.log(
+                                f"Mermaid図をレンダリングしました: {result_data['mermaid_path']}"
+                            )
                             visualization_data['mermaid_diagrams'].append(result_data)
                     except:
-                        self.logger.log("Mermaid図のレンダリング結果の解析に失敗しました")
+                        self.logger.log(
+                            "Mermaid図のレンダリング結果の解析に失敗しました"
+                        )
 
         # LLMとの対話を通じて視覚化の計画を立てる
-        visualization_plan = self._create_visualization_plan(user_prompt, strategy_text, combined_data)
-        
+        visualization_plan = self._create_visualization_plan(
+            user_prompt, strategy_text, combined_data
+        )
+
         # 視覚化計画に基づいてグラフとMermaid図を生成
         try:
-            self._generate_visualizations_from_plan(visualization_plan, visualization_data, combined_data)
+            self._generate_visualizations_from_plan(
+                visualization_plan, visualization_data, combined_data
+            )
         except Exception as e:
             self.logger.log(f"視覚化計画からの生成中にエラーが発生しました: {str(e)}")
             # エラーが発生しても処理を続行
 
         # 数値データの抽出とグラフ化のためのプロンプト
-        visualization_prompt = self._create_visualization_prompt(user_prompt, strategy_text, combined_data)
-        
+        visualization_prompt = self._create_visualization_prompt(
+            user_prompt, strategy_text, combined_data
+        )
+
         # 会話履歴の初期化
         visualization_conversation = []
         visualization_conversation.append(
@@ -295,174 +317,32 @@ class ResearchManager:
         response = self.model.generate_response(
             MODEL_CONFIG[PRIMARY_MODEL],
             visualization_conversation,
-            [{"text": "あなたは優秀なデータ分析者です。収集したデータから視覚的な情報を作成してください。"}],
-            {'temperature': 0},
-            TOOL_CONFIG,
-        )
-
-        # AIの思考プロセスを出力
-        self.logger.log("AI の視覚化計画:")
-        for content in response['output']['message']['content']:
-            if 'text' in content:
-                self.logger.log(content['text'])
-        self.logger.log("")
-
-        # ツール使用の処理
-        tool_use = self.tool_handler.process_tool_response(response)
-        
-        # ツール使用がない場合は終了
-        if not tool_use:
-            self.logger.log("視覚化のためのツール使用なし")
-            return visualization_data
-
-        # アシスタントメッセージを追加
-        visualization_conversation.append(
-            {
-                'role': 'assistant',
-                'content': response['output']['message']['content'],
-            }
-        )
-
-        # グラフ生成ツールの使用を処理
-        if tool_use['name'] == 'generate_graph':
-            result = self.tool_handler.generate_graph(**tool_use['input'])
-            
-            try:
-                result_data = json.loads(result)
-                if 'graph_path' in result_data:
-                    self.logger.log(f"グラフを生成しました: {result_data['graph_path']}")
-                    visualization_data['graphs'].append(result_data)
-            except:
-                self.logger.log("グラフ生成結果の解析に失敗しました")
-                
-            # ツール結果を追加
-            visualization_conversation.append(
+            [
                 {
-                    'role': 'user',
-                    'content': [
-                        {
-                            'toolResult': {
-                                'toolUseId': tool_use['toolUseId'],
-                                'content': [{'text': result}],
-                            }
-                        }
-                    ],
-                }
-            )
-            
-            # 追加のグラフ生成を試みる
-            for _ in range(3):  # 最大3回の追加グラフ生成を試みる（元の2回から増加）
-                response = self.model.generate_response(
-                    MODEL_CONFIG[PRIMARY_MODEL],
-                    visualization_conversation,
-                    [{"text": "他にも視覚化できるデータがあれば、グラフを生成してください。特に時系列データ、比較データ、割合データなど、グラフ化に適したデータを探してください。"}],
-                    {'temperature': 0},
-                    TOOL_CONFIG,
-                )
-                
-                tool_use = self.tool_handler.process_tool_response(response)
-                if not tool_use or tool_use['name'] != 'generate_graph':
-                    break
-                    
-                visualization_conversation.append(
-                    {
-                        'role': 'assistant',
-                        'content': response['output']['message']['content'],
-                    }
-                )
-                
-                result = self.tool_handler.generate_graph(**tool_use['input'])
-                
-                try:
-                    result_data = json.loads(result)
-                    if 'graph_path' in result_data:
-                        self.logger.log(f"追加のグラフを生成しました: {result_data['graph_path']}")
-                        visualization_data['graphs'].append(result_data)
-                except:
-                    self.logger.log("追加のグラフ生成結果の解析に失敗しました")
-                    
-                visualization_conversation.append(
-                    {
-                        'role': 'user',
-                        'content': [
-                            {
-                                'toolResult': {
-                                    'toolUseId': tool_use['toolUseId'],
-                                    'content': [{'text': result}],
-                                }
-                            }
-                        ],
-                    }
-                )
+                    "text": """あなたは優秀なデータ可視化の専門家です。
+ユーザーは <title> タグに関する調査データと、<strategy> タグで調査戦略、<data> タグで収集したデータの一部を与えます。
+効果的な視覚化計画を立ててください。
+ただし <consideration> タグで与える点を考慮した上で、視覚化計画を立ててください。特に <contemplation> タグで与える視覚化タイプを検討してください。
+<consideration>
+- どのような種類のデータが視覚化に適しているか（定量的データ、定性的データ、比較データ、時系列データなど）
+- 最も効果的な視覚化の種類（グラフ、チャート、図表、フロー図など）
+- 各視覚化の目的と意図（何を伝えたいのか）
+- 視覚化に必要なデータ要素
+</consideration>
+<contemplation>
+- 時系列データの推移を示す折れ線グラフ
+- 比較データを示す棒グラフ
+- 割合を示す円グラフ
+- プロセスや関係性を示すフロー図（mermaid）
+- 概念や構造を示す図表（mermaid）
+- 分類や階層を示すマインドマップ（mermaid）
+</contemplation>
 
-        # 表データの抽出
-        tables = self._extract_tables_from_data(combined_data)
-        if tables:
-            visualization_data['tables'] = tables
-            self.logger.log(f"{len(tables)} 個の表データを抽出しました")
-
-        self.logger.log(f"視覚化データの準備完了: グラフ {len(visualization_data['graphs'])} 個, 表 {len(visualization_data['tables'])} 個, Mermaid図 {len(visualization_data['mermaid_diagrams'])} 個, 文脈付き画像 {len(visualization_data['images_with_context'])} 個")
-        return visualization_data
-
-    def _extract_image_context(self, collected_data: List[str], visualization_data: Dict[str, Any]) -> None:
-        """
-        収集したデータから画像とその文脈情報を抽出
-
-        Args:
-            collected_data: 収集したデータのリスト
-            visualization_data: 視覚化データ辞書（更新される）
-        """
-        for data_item in collected_data:
-            # 画像パスを検索
-            image_paths = re.findall(r'([^/\s]+_images/[^)\s]+\.(png|jpg|jpeg|gif))', data_item)
-            
-            for img_path_tuple in image_paths:
-                img_path = img_path_tuple[0]
-                
-                # 画像の前後のテキストを抽出（コンテキスト）
-                # 画像パスの前後約200文字を取得
-                img_index = data_item.find(img_path)
-                if img_index >= 0:
-                    start_index = max(0, img_index - 200)
-                    end_index = min(len(data_item), img_index + len(img_path) + 200)
-                    context = data_item[start_index:end_index]
-                    
-                    # 画像の説明を抽出（キャプションらしき部分）
-                    caption = ""
-                    caption_match = re.search(r'(?:図|画像|イメージ|Figure)[:：]?\s*([^\n.。]+)[.。]?', context)
-                    if caption_match:
-                        caption = caption_match.group(1).strip()
-                    
-                    # 画像と文脈情報を保存
-                    visualization_data['images_with_context'].append({
-                        'path': img_path,
-                        'context': context,
-                        'caption': caption
-                    })
-                    
-                    self.logger.log(f"画像の文脈情報を抽出しました: {img_path}")
-
-    def _create_visualization_plan(self, user_prompt: str, strategy_text: str, data: str) -> Dict[str, Any]:
-        """
-        視覚化計画を作成するためにLLMと対話
-
-        Args:
-            user_prompt: ユーザーの研究テーマ
-            strategy_text: 調査戦略テキスト
-            data: 収集したデータ
-
-        Returns:
-            Dict[str, Any]: 視覚化計画
-        """
-        self.logger.log("視覚化計画の作成を開始します")
-
-        # mermaidの利用用途を理解させるためのPrompt
-        mermaid_prompt = f"""
-
-Mermaidは様々なグラフやチャートの出力形式に対応したフォーマットです。
+<mermaid> で与える Mermaid に関する利用ルールに注意を払ってください。
+<mermaid>
+Mermaid は様々なグラフやチャートの出力形式に対応したフォーマットです。
 
 #Mermaid出力形式・図表タイプのガイドとgraph_type
-
 
 ##適切な図表タイプの選び方と各タイプの正確な宣言方法
 
@@ -534,67 +414,229 @@ requirementDiagram
 ,
 ZenUML：シーケンス図の代替表現
 zenuml
-        """
-        
-        # 視覚化計画作成のためのプロンプト
-        planning_prompt = f"""あなたは優秀なデータ可視化の専門家です。
-「{user_prompt}」に関する調査データから、効果的な視覚化計画を立ててください。
+</mermaid>
 
-調査戦略:
-{strategy_text[:1000]}
-
-収集したデータ（一部）:
-{data[:5000]}
-
-以下の点について検討し、視覚化計画を立ててください:
-
-1. どのような種類のデータが視覚化に適しているか（定量的データ、定性的データ、比較データ、時系列データなど）
-2. 最も効果的な視覚化の種類（グラフ、チャート、図表、フロー図など）
-3. 各視覚化の目的と意図（何を伝えたいのか）
-4. 視覚化に必要なデータ要素
-
-特に以下の視覚化タイプを検討してください:
-- 時系列データの推移を示す折れ線グラフ
-- 比較データを示す棒グラフ
-- 割合を示す円グラフ
-- プロセスや関係性を示すフロー図（mermaid）
-- 概念や構造を示す図表（mermaid）
-- 分類や階層を示すマインドマップ（mermaid）
-
-mermaidに関する利用ルールは以下です。
-{mermaid_prompt}
-
-出力するJSON内のルールは以下です。
-
+出力は JSON で </rule> で与えるルールを遵守してください。
+<rule>
 "type"："graph","mermaid"のどちらかを選択してください。
-"graph_type": typeがgraphの場合はmatplotlibのグラフタイプを、typeがmermaidの場合は、上記のmermaid用のgraph_typeをいれてください。
+"graph_type": typeがgraphの場合は matplotlib のグラフタイプを、type が mermaid の場合は、上記の Mermaid 用の graph_type をいれてください。
 
 JSON形式で視覚化計画を出力してください。以下は出力形式の例です:
 '''json
-{{
-  "visualizations": [
-    {{
-      "type": "graph",
-      "graph_type": "line",
-      "title": "年間売上推移",
-      "purpose": "過去5年間の売上傾向を示す",
-      "data_needed": "年度と売上額のデータ",
-      "x_label": "年度",
-      "y_label": "売上額（百万円）"
-    }},
-    {{
-      "type": "mermaid",
-      "diagram_type": "flowchart",
-      "title": "製品開発プロセス",
-      "purpose": "製品開発の各段階と関係者を示す",
-      "description": "企画から販売までのプロセスフロー"
-    }}
-  ]
-}}
+{
+    "visualizations": [
+        {
+            "type": "graph",
+            "graph_type": "line",
+            "title": "年間売上推移",
+            "purpose": "過去5年間の売上傾向を示す",
+            "data_needed": "年度と売上額のデータ",
+            "x_label": "年度",
+            "y_label": "売上額（百万円）"
+        },
+        {
+            "type": "mermaid",
+            "diagram_type": "flowchart",
+            "title": "製品開発プロセス",
+            "purpose": "製品開発の各段階と関係者を示す",
+            "description": "企画から販売までのプロセスフロー"
+        }
+    ]
+}
 '''
-
+</rule>
+上記の出力フォーマット以外の出力だけしてください。
 視覚化計画を作成してください。
 """
+                }
+            ],
+            {'temperature': 0},
+            TOOL_CONFIG,
+        )
+
+        # AIの思考プロセスを出力
+        self.logger.log("AI の視覚化計画:")
+        for content in response['output']['message']['content']:
+            if 'text' in content:
+                self.logger.log(content['text'])
+        self.logger.log("")
+
+        # ツール使用の処理
+        tool_use = self.tool_handler.process_tool_response(response)
+
+        # ツール使用がない場合は終了
+        if not tool_use:
+            self.logger.log("視覚化のためのツール使用なし")
+            return visualization_data
+
+        # アシスタントメッセージを追加
+        visualization_conversation.append(
+            {
+                'role': 'assistant',
+                'content': response['output']['message']['content'],
+            }
+        )
+
+        # グラフ生成ツールの使用を処理
+        if tool_use['name'] == 'generate_graph':
+            result = self.tool_handler.generate_graph(**tool_use['input'])
+
+            try:
+                result_data = json.loads(result)
+                if 'graph_path' in result_data:
+                    self.logger.log(
+                        f"グラフを生成しました: {result_data['graph_path']}"
+                    )
+                    visualization_data['graphs'].append(result_data)
+            except:
+                self.logger.log("グラフ生成結果の解析に失敗しました")
+
+            # ツール結果を追加
+            visualization_conversation.append(
+                {
+                    'role': 'user',
+                    'content': [
+                        {
+                            'toolResult': {
+                                'toolUseId': tool_use['toolUseId'],
+                                'content': [{'text': result}],
+                            }
+                        }
+                    ],
+                }
+            )
+
+            # 追加のグラフ生成を試みる
+            for _ in range(3):  # 最大3回の追加グラフ生成を試みる（元の2回から増加）
+                response = self.model.generate_response(
+                    MODEL_CONFIG[PRIMARY_MODEL],
+                    visualization_conversation,
+                    [
+                        {
+                            "text": "他にも視覚化できるデータがあれば、グラフを生成してください。特に時系列データ、比較データ、割合データなど、グラフ化に適したデータを探してください。"
+                        }
+                    ],
+                    {'temperature': 0},
+                    TOOL_CONFIG,
+                )
+
+                tool_use = self.tool_handler.process_tool_response(response)
+                if not tool_use or tool_use['name'] != 'generate_graph':
+                    break
+
+                visualization_conversation.append(
+                    {
+                        'role': 'assistant',
+                        'content': response['output']['message']['content'],
+                    }
+                )
+
+                result = self.tool_handler.generate_graph(**tool_use['input'])
+
+                try:
+                    result_data = json.loads(result)
+                    if 'graph_path' in result_data:
+                        self.logger.log(
+                            f"追加のグラフを生成しました: {result_data['graph_path']}"
+                        )
+                        visualization_data['graphs'].append(result_data)
+                except:
+                    self.logger.log("追加のグラフ生成結果の解析に失敗しました")
+
+                visualization_conversation.append(
+                    {
+                        'role': 'user',
+                        'content': [
+                            {
+                                'toolResult': {
+                                    'toolUseId': tool_use['toolUseId'],
+                                    'content': [{'text': result}],
+                                }
+                            }
+                        ],
+                    }
+                )
+
+        # 表データの抽出
+        tables = self._extract_tables_from_data(combined_data)
+        if tables:
+            visualization_data['tables'] = tables
+            self.logger.log(f"{len(tables)} 個の表データを抽出しました")
+
+        self.logger.log(
+            f"視覚化データの準備完了: グラフ {len(visualization_data['graphs'])} 個, 表 {len(visualization_data['tables'])} 個, Mermaid図 {len(visualization_data['mermaid_diagrams'])} 個, 文脈付き画像 {len(visualization_data['images_with_context'])} 個"
+        )
+        return visualization_data
+
+    def _extract_image_context(
+        self, collected_data: List[str], visualization_data: Dict[str, Any]
+    ) -> None:
+        """
+        収集したデータから画像とその文脈情報を抽出
+
+        Args:
+            collected_data: 収集したデータのリスト
+            visualization_data: 視覚化データ辞書（更新される）
+        """
+        for data_item in collected_data:
+            # 画像パスを検索
+            image_paths = re.findall(
+                r'([^/\s]+_images/[^)\s]+\.(png|jpg|jpeg|gif))', data_item
+            )
+
+            for img_path_tuple in image_paths:
+                img_path = img_path_tuple[0]
+
+                # 画像の前後のテキストを抽出（コンテキスト）
+                # 画像パスの前後約200文字を取得
+                img_index = data_item.find(img_path)
+                if img_index >= 0:
+                    start_index = max(0, img_index - 200)
+                    end_index = min(len(data_item), img_index + len(img_path) + 200)
+                    context = data_item[start_index:end_index]
+
+                    # 画像の説明を抽出（キャプションらしき部分）
+                    caption = ""
+                    caption_match = re.search(
+                        r'(?:図|画像|イメージ|Figure)[:：]?\s*([^\n.。]+)[.。]?',
+                        context,
+                    )
+                    if caption_match:
+                        caption = caption_match.group(1).strip()
+
+                    # 画像と文脈情報を保存
+                    visualization_data['images_with_context'].append(
+                        {'path': img_path, 'context': context, 'caption': caption}
+                    )
+
+                    self.logger.log(f"画像の文脈情報を抽出しました: {img_path}")
+
+    def _create_visualization_plan(
+        self, user_prompt: str, strategy_text: str, data: str
+    ) -> Dict[str, Any]:
+        """
+        視覚化計画を作成するためにLLMと対話
+
+        Args:
+            user_prompt: ユーザーの研究テーマ
+            strategy_text: 調査戦略テキスト
+            data: 収集したデータ
+
+        Returns:
+            Dict[str, Any]: 視覚化計画
+        """
+        self.logger.log("視覚化計画の作成を開始します")
+
+        # 視覚化計画作成のためのプロンプト
+        planning_prompt = f'''<title>
+{user_prompt}
+</title>
+<strategy>
+{strategy_text[:1000]}
+</strategy>
+<data>
+{data[:5000]}
+</data>'''
 
         # 会話履歴の初期化
         planning_conversation = []
@@ -606,7 +648,137 @@ JSON形式で視覚化計画を出力してください。以下は出力形式�
         response = self.model.generate_response(
             MODEL_CONFIG[PRIMARY_MODEL],
             planning_conversation,
-            [{"text": "あなたは優秀なデータ可視化の専門家です。効果的な視覚化計画を立ててください。"}],
+            [
+                {
+                    "text": """あなたは優秀なデータ可視化の専門家です。
+ユーザーは <title> タグに関する調査データと、<strategy> タグで調査戦略、<data> タグで収集したデータの一部を与えます。
+効果的な視覚化計画を立ててください。
+ただし <consideration> タグで与える点を考慮した上で、視覚化計画を立ててください。特に <contemplation> タグで与える視覚化タイプを検討してください。
+<consideration>
+- どのような種類のデータが視覚化に適しているか（定量的データ、定性的データ、比較データ、時系列データなど）
+- 最も効果的な視覚化の種類（グラフ、チャート、図表、フロー図など）
+- 各視覚化の目的と意図（何を伝えたいのか）
+- 視覚化に必要なデータ要素
+</consideration>
+<contemplation>
+- 時系列データの推移を示す折れ線グラフ
+- 比較データを示す棒グラフ
+- 割合を示す円グラフ
+- プロセスや関係性を示すフロー図（mermaid）
+- 概念や構造を示す図表（mermaid）
+- 分類や階層を示すマインドマップ（mermaid）
+</contemplation>
+
+<mermaid> で与える Mermaid に関する利用ルールに注意を払ってください。
+<mermaid>
+Mermaid は様々なグラフやチャートの出力形式に対応したフォーマットです。
+
+#Mermaid出力形式・図表タイプのガイドとgraph_type
+
+##適切な図表タイプの選び方と各タイプの正確な宣言方法
+
+###プロセスとフロー
+フローチャート：意思決定や処理の流れを示す
+graph TD  // または LR, TB, RL, BT
+,
+シーケンス図：時間順の相互作用やメッセージのやり取りを示す
+sequenceDiagram
+,
+状態図：システムの状態遷移を示す
+stateDiagram-v2
+
+###関係性とデータモデル
+
+クラス図：オブジェクト指向設計やデータモデルを示す
+classDiagram
+,
+ER図：データベースのエンティティと関係を示す
+erDiagram
+,
+C4コンテキスト図：システムアーキテクチャを示す
+C4Context
+
+###計画と進捗
+
+ガントチャート：プロジェクトのタイムラインと進捗を示す
+gantt
+,
+カンバンボード：タスクの状態と進行状況を示す
+kanban
+
+###データ分析と比較
+
+円グラフ：全体に対する割合を示す
+pie
+,
+象限チャート：2つの軸による分類を示す
+quadrantChart
+,
+XYチャート：数値データの関係や傾向を示す
+xychart-beta
+,
+サンキー図：フローの量や変換を示す
+sankey-beta
+
+###概念と構造
+マインドマップ：アイデアや概念の階層関係を示す
+mindmap
+,
+タイムライン：時系列の出来事を示す
+timeline
+,
+ブロック図：システムコンポーネントの構造を示す
+block-beta
+
+###技術的図表
+Gitグラフ：バージョン管理の履歴とブランチを示す
+gitGraph
+,
+パケット図：データ構造やプロトコルを示す
+packet-beta
+,
+アーキテクチャ図：システムの構成要素と関係を示す
+architecture-beta
+,
+要件図：システム要件と関係を示す
+requirementDiagram
+,
+ZenUML：シーケンス図の代替表現
+zenuml
+</mermaid>
+
+出力は JSON で </rule> で与えるルールを遵守してください。
+<rule>
+"type"："graph","mermaid"のどちらかを選択してください。
+"graph_type": typeがgraphの場合は matplotlib のグラフタイプを、type が mermaid の場合は、上記の Mermaid 用の graph_type をいれてください。
+
+JSON形式で視覚化計画を出力してください。以下は出力形式の例です:
+'''json
+{
+    "visualizations": [
+        {
+            "type": "graph",
+            "graph_type": "line",
+            "title": "年間売上推移",
+            "purpose": "過去5年間の売上傾向を示す",
+            "data_needed": "年度と売上額のデータ",
+            "x_label": "年度",
+            "y_label": "売上額（百万円）"
+        },
+        {
+            "type": "mermaid",
+            "diagram_type": "flowchart",
+            "title": "製品開発プロセス",
+            "purpose": "製品開発の各段階と関係者を示す",
+            "description": "企画から販売までのプロセスフロー"
+        }
+    ]
+}
+'''
+</rule>
+視覚化計画を作成してください。"""
+                }
+            ],
             {'temperature': 0.2},  # 少し創造性を持たせる
         )
 
@@ -617,7 +789,7 @@ JSON形式で視覚化計画を出力してください。以下は出力形式�
         for content in response['output']['message']['content']:
             if 'text' in content:
                 plan_text += content['text']
-        
+
         # JSON部分を抽出
         json_match = re.search(r'```json\s*(.*?)\s*```', plan_text, re.DOTALL)
         if json_match:
@@ -640,11 +812,13 @@ JSON形式で視覚化計画を出力してください。以下は出力形式�
                     return plan
             except:
                 self.logger.log("視覚化計画の代替パースにも失敗しました")
-        
+
         # 失敗した場合は空の計画を返す
         return {"visualizations": []}
 
-    def _generate_visualizations_from_plan(self, plan: Dict[str, Any], visualization_data: Dict[str, Any], data: str) -> None:
+    def _generate_visualizations_from_plan(
+        self, plan: Dict[str, Any], visualization_data: Dict[str, Any], data: str
+    ) -> None:
         """
         視覚化計画に基づいてグラフとMermaid図を生成
 
@@ -656,11 +830,11 @@ JSON形式で視覚化計画を出力してください。以下は出力形式�
         if 'visualizations' not in plan:
             self.logger.log("視覚化計画に 'visualizations' キーがありません")
             return
-            
+
         for viz in plan['visualizations']:
             try:
                 viz_type = viz.get('type', '')
-                
+
                 if viz_type == 'graph':
                     self._generate_graph_from_plan(viz, visualization_data, data)
                 elif viz_type == 'mermaid':
@@ -671,7 +845,9 @@ JSON形式で視覚化計画を出力してください。以下は出力形式�
                 self.logger.log(f"視覚化の生成中にエラーが発生しました: {str(e)}")
                 # エラーが発生しても次の視覚化の処理を続行
 
-    def _generate_graph_from_plan(self, viz: Dict[str, Any], visualization_data: Dict[str, Any], data: str) -> None:
+    def _generate_graph_from_plan(
+        self, viz: Dict[str, Any], visualization_data: Dict[str, Any], data: str
+    ) -> None:
         """
         計画に基づいてグラフを生成
 
@@ -687,36 +863,19 @@ JSON形式で視覚化計画を出力してください。以下は出力形式�
             data_needed = viz.get('data_needed', '')
             x_label = viz.get('x_label', '')
             y_label = viz.get('y_label', '')
-            
+
             if not graph_type or not title:
                 self.logger.log("グラフタイプまたはタイトルが指定されていません")
                 return
-                
+
             # データ抽出のためのプロンプト
-            data_extraction_prompt = f"""あなはデータ抽出の専門家です。
-以下のデータから、「{title}」というグラフを作成するためのデータを抽出してください。
-
-グラフの種類: {graph_type}
-目的: {purpose}
-必要なデータ: {data_needed}
-X軸ラベル: {x_label}
-Y軸ラベル: {y_label}
-
-データ:
-{data[:10000]}
-
-以下の形式でJSONを出力してください:
-```json
-{{
-  "labels": ["ラベル1", "ラベル2", ...],
-  "data": [値1, 値2, ...],
-  "series_labels": ["系列1", "系列2", ...],  // 複数系列の場合のみ
-  "multi_data": [[系列1の値], [系列2の値], ...],  // 複数系列の場合のみ
-}}
-```
-
-データが見つからない場合は空のJSONを返してください。
-"""
+            data_extraction_prompt = f'''<title>{title}</title>
+<graph-type>{graph_type}</graph-type>
+<purpose>{purpose}</purpose>
+<data-needed>{data_needed}</data-needed>
+<x-label>{x_label}</x-label>
+<y-label>{y_label}</y-label>
+<data>{data[:10000]}</data>'''
 
             # 会話履歴の初期化
             extraction_conversation = []
@@ -728,7 +887,23 @@ Y軸ラベル: {y_label}
             response = self.model.generate_response(
                 MODEL_CONFIG[PRIMARY_MODEL],
                 extraction_conversation,
-                [{"text": "あなたはデータ抽出の専門家です。指定されたデータを正確に抽出してください。"}],
+                [
+                    {
+                        "text": '''あなたはデータ抽出の専門家です。
+ユーザーは <title> でグラフのタイトルを、<graph-type> でグラフ種類を、<purpose> でグラフの目的を、<data_needed> で必要なデータを、<x-label> で X 軸のラベルを、<y-label> で Y 軸のラベルを、<data> でデータを与えます。
+以下の JSON 形式でデータを出力してください。
+```json
+{
+  "labels": ["ラベル1", "ラベル2", ...],
+  "data": [値1, 値2, ...],
+  "series_labels": ["系列1", "系列2", ...],  // 複数系列の場合のみ
+  "multi_data": [[系列1の値], [系列2の値], ...],  // 複数系列の場合のみ
+}
+```
+ただし、データが見つからない場合は空の JSON を返してください。
+出力は ```json から始め ``` で必ず終えてください。'''
+                    }
+                ],
                 {'temperature': 0},
             )
 
@@ -737,16 +912,18 @@ Y軸ラベル: {y_label}
             for content in response['output']['message']['content']:
                 if 'text' in content:
                     extraction_text += content['text']
-            
+
             # JSON部分を抽出
             json_match = re.search(r'```json\s*(.*?)\s*```', extraction_text, re.DOTALL)
             if json_match:
                 json_str = json_match.group(1)
                 try:
                     extracted_data = json.loads(json_str)
-                    
+
                     # 抽出したデータでグラフを生成
-                    if 'labels' in extracted_data and ('data' in extracted_data or 'multi_data' in extracted_data):
+                    if 'labels' in extracted_data and (
+                        'data' in extracted_data or 'multi_data' in extracted_data
+                    ):
                         graph_params = {
                             'graph_type': graph_type,
                             'title': title,
@@ -754,33 +931,42 @@ Y軸ラベル: {y_label}
                             'y_label': y_label,
                             'labels': extracted_data.get('labels', []),
                         }
-                        
+
                         # 単一系列か複数系列かを判断
-                        if 'multi_data' in extracted_data and 'series_labels' in extracted_data:
+                        if (
+                            'multi_data' in extracted_data
+                            and 'series_labels' in extracted_data
+                        ):
                             graph_params['multi_data'] = extracted_data['multi_data']
-                            graph_params['series_labels'] = extracted_data['series_labels']
+                            graph_params['series_labels'] = extracted_data[
+                                'series_labels'
+                            ]
                         elif 'data' in extracted_data:
                             graph_params['data'] = extracted_data['data']
-                        
+
                         # グラフ生成
                         result = self.tool_handler.generate_graph(**graph_params)
-                        
+
                         try:
                             result_data = json.loads(result)
                             if 'graph_path' in result_data:
                                 # 目的情報を追加
                                 result_data['purpose'] = purpose
                                 visualization_data['graphs'].append(result_data)
-                                self.logger.log(f"計画に基づいてグラフを生成しました: {result_data['graph_path']}")
+                                self.logger.log(
+                                    f"計画に基づいてグラフを生成しました: {result_data['graph_path']}"
+                                )
                         except:
                             self.logger.log("グラフ生成結果の解析に失敗しました")
-                    
+
                 except json.JSONDecodeError:
                     self.logger.log("データ抽出のJSON解析に失敗しました")
         except Exception as e:
             self.logger.log(f"グラフ生成中にエラーが発生しました: {str(e)}")
 
-    def _generate_mermaid_from_plan(self, viz: Dict[str, Any], visualization_data: Dict[str, Any], data: str) -> None:
+    def _generate_mermaid_from_plan(
+        self, viz: Dict[str, Any], visualization_data: Dict[str, Any], data: str
+    ) -> None:
         """
         計画に基づいてMermaid図を生成
 
@@ -799,30 +985,18 @@ Y軸ラベル: {y_label}
             title = viz.get('title', 'Mermaid Diagram')
             purpose = viz.get('purpose', '')
             description = viz.get('description', '')
-            
+
             if not diagram_type:
                 self.logger.log(f"Mermaid図のタイプが指定されていません:{viz}")
                 return
-                
+
             # Mermaid図生成のためのプロンプト
-            mermaid_prompt = f"""あなたはMermaid図の専門家です。
-以下の情報に基づいて、「{title}」というMermaid図を作成してください。
-
-図の種類: {diagram_type}
-目的: {purpose}
-説明: {description}
-
-データ:
-{data[:5000]}
-
-以下の要件を満たすMermaid図のコードを生成してください:
-1. {diagram_type}の正しい構文を使用すること
-2. 図は明確で読みやすいこと
-3. 必要に応じて色やスタイルを適用すること
-4. 複雑すぎず、シンプルで理解しやすいこと
-
-Mermaid図のコードのみを出力してください。コードの前後に```mermaidや```などのマークダウン記法は不要です。
-"""
+            mermaid_prompt = f'''<title>{title}</title>
+<diagram-type>{diagram_type}</diagram-type>
+<purpose>{purpose}</purpose>
+<description>{description}</description>
+<data>{data[:5000]}</data>
+'''
 
             # 会話履歴の初期化
             mermaid_conversation = []
@@ -834,7 +1008,21 @@ Mermaid図のコードのみを出力してください。コードの前後に`
             response = self.model.generate_response(
                 MODEL_CONFIG[PRIMARY_MODEL],
                 mermaid_conversation,
-                [{"text": "あなたはMermaid図の専門家です。指定された要件に基づいて適切なMermaid図を生成してください。"}],
+                [
+                    {
+                        "text": '''あなたは Mermaid 図の専門家です。ユーザーが <title> タグで与える Mermaid 図を作成してください。
+図の種類は <diagram-type> タグで、目的は <purpose> タグで、説明は <description> タグで、データは <data> タグで、それぞれユーザーが与えます。
+ただし <rules> で与えるルールを遵守してください。
+<rules>
+* <diagram-type> タグで与えた図の記法を遵守すること。
+* 図は明確で読みやすいこと
+* 必要に応じて色やスタイルを適用すること
+* 複雑すぎず、シンプルで理解しやすいこと
+* 図の目的に沿っていること
+<rules>
+コードの前後に```mermaidや```などのマークダウン記法は不要です。Mermaid図のコードのみを出力してください。'''
+                    }
+                ],
                 {'temperature': 0.2},  # 少し創造性を持たせる
             )
 
@@ -843,25 +1031,29 @@ Mermaid図のコードのみを出力してください。コードの前後に`
             for content in response['output']['message']['content']:
                 if 'text' in content:
                     mermaid_text += content['text']
-            
+
             # Mermaidコードを抽出（マークダウンコードブロックがある場合とない場合の両方に対応）
-            mermaid_match = re.search(r'```mermaid\s*(.*?)\s*```', mermaid_text, re.DOTALL)
+            mermaid_match = re.search(
+                r'```mermaid\s*(.*?)\s*```', mermaid_text, re.DOTALL
+            )
             if mermaid_match:
                 mermaid_code = mermaid_match.group(1)
             else:
                 # コードブロックがない場合は全体をMermaidコードとして扱う
                 mermaid_code = mermaid_text.strip()
-            
+
             # Mermaid図をレンダリング
             result = self.tool_handler.render_mermaid(mermaid_code, title)
-            
+
             try:
                 result_data = json.loads(result)
                 if 'mermaid_path' in result_data:
                     # 目的情報を追加
                     result_data['purpose'] = purpose
                     visualization_data['mermaid_diagrams'].append(result_data)
-                    self.logger.log(f"計画に基づいてMermaid図を生成しました: {result_data['mermaid_path']}")
+                    self.logger.log(
+                        f"計画に基づいてMermaid図を生成しました: {result_data['mermaid_path']}"
+                    )
             except:
                 self.logger.log("Mermaid図のレンダリング結果の解析に失敗しました")
         except Exception as e:
@@ -878,10 +1070,12 @@ Mermaid図のコードのみを出力してください。コードの前後に`
             List[Dict[str, Any]]: 抽出した表データのリスト
         """
         tables = []
-        
+
         # マークダウン形式の表を検出
-        markdown_tables = re.findall(r'(\|[^\n]+\|\n\|[-:| ]+\|\n(?:\|[^\n]+\|\n)+)', data)
-        
+        markdown_tables = re.findall(
+            r'(\|[^\n]+\|\n\|[-:| ]+\|\n(?:\|[^\n]+\|\n)+)', data
+        )
+
         for i, table in enumerate(markdown_tables):
             # 表のタイトルを抽出（表の前の行がタイトルっぽい場合）
             title = f"表 {i+1}"
@@ -891,19 +1085,25 @@ Mermaid図のコードのみを出力してください。コードの前後に`
                 prev_text = data[:table_pos].strip()
                 last_line = prev_text.split('\n')[-1]
                 # 行が短く、「表」や「一覧」などの単語を含む場合はタイトルとして使用
-                if len(last_line) < 50 and ('表' in last_line or '一覧' in last_line or 'リスト' in last_line):
+                if len(last_line) < 50 and (
+                    '表' in last_line or '一覧' in last_line or 'リスト' in last_line
+                ):
                     title = last_line
-            
-            tables.append({
-                'type': 'markdown',
-                'content': table,
-                'id': f'table_{i+1}',
-                'title': title
-            })
-            
+
+            tables.append(
+                {
+                    'type': 'markdown',
+                    'content': table,
+                    'id': f'table_{i+1}',
+                    'title': title,
+                }
+            )
+
         return tables
 
-    def _create_visualization_prompt(self, user_prompt: str, strategy_text: str, data: str) -> str:
+    def _create_visualization_prompt(
+        self, user_prompt: str, strategy_text: str, data: str
+    ) -> str:
         """
         視覚化プロンプトの作成
 
@@ -915,28 +1115,15 @@ Mermaid図のコードのみを出力してください。コードの前後に`
         Returns:
             str: 視覚化プロンプト
         """
-        return f'''あなたは優秀なデータ分析者です。
-「{user_prompt}」に関する調査データから、レポートの意味を深めるために有用と思われる場合に、視覚的な情報を作成してください。
-
-調査戦略:
+        return f'''<title>
+{user_prompt}
+</title>
+<strategy>
 {strategy_text}
-
-収集したデータ:
+</strategy>
+<data>
 {data[:10000]}  # データが長い場合は一部を使用
-
-以下の点に注意してください:
-1. 収集したデータから数値データを見つけ、グラフ化できるものを特定してください。単にグラフにするだけでなく、グラフを用いることが適切である比較・推移・可視化に意味があるものを選択してください。
-2. 表形式のデータがあれば、それをグラフに変換することを検討してください
-3. 時系列データ、比較データ、割合データなど、グラフ化に適したデータを探してください
-4. 文字列や定性的なものでも一覧化・データ化・フロー化・整理できるものはmermaidのグラフが使えないか検討してください
-5. 数値データでは、generate_graphツールを使用して、適切なグラフ（棒グラフ、折れ線グラフ、円グラフなど）を作成する事に意味があるか、どのように見せたら理解しやすくなるかを検討してください
-6. グラフ作成時は、グラフのタイトル、軸ラベル、凡例などを適切に設定してください
-7. 割合の比較には円グラフかmermaidのpie、四象限はmermaid図のquadrantChart、予定やスケジュールはmermaidのgantt、関係図はmermaidのerDiagram、クラス図はmermaidのclassDiagram、シーケンスはmermaidのsequenceDiagram、情報整理にはmermaidのmindmap、タイムラインにはmermaidのtimeline、コストやユーザ行動など数値分類の推移を表すにはmermaidのsanky-beta、アーキテクチャ図にはmermaidのarchitecture-betaが利用できます
-8. 作成したグラフは最終レポートで使用されます
-
-データを分析し、グラフ化できるデータがあれば、generate_graphツールを使用してグラフを作成してください。
-グラフ化できるデータがない場合は、その旨を説明してください。
-'''
+</data>'''
 
     def _initialize_conversation(self, user_prompt: str, pre_research_data: str):
         """会話の初期化"""
@@ -945,7 +1132,14 @@ Mermaid図のコードのみを出力してください。コードの前後に`
                 "role": "user",
                 "content": [
                     {
-                        "text": f'「{user_prompt}」について、以下の事前調査結果をもとに検討しましょう：\n\n事前に収集した調査結果はこちらです：{pre_research_data}'
+                        "text": f'''今回のトピックと事前調査結果は以下の通りです。
+<topic>
+{user_prompt}
+</topic>
+<pre-research>
+{pre_research_data}
+<pre-research>
+一緒に調査内容を検討しましょう。よろしくお願いします。まずは何かアイデアはありますか？'''
                     }
                 ],
             }
@@ -995,51 +1189,38 @@ Mermaid図のコードのみを出力してください。コードの前後に`
 
     def _create_pre_research_prompt(self, user_prompt: str) -> str:
         """事前調査プロンプトの作成"""
-        return f'''あなたは優秀なリサーチャーです。
-「{user_prompt}」について、コンテキストがわからない用語も含めてキーワードに分割した上で、以下の点を明らかにするための情報を収集してください：
+        return user_prompt
 
-1. 主要な概念や用語の定義
-2. 最新のニュースや画像
-3. 関連する用語や関連するコンテキスト
-4. 用語に関連する最新の動向や傾向や話題
-5. 用語に関連する最新の研究
-6. データポイント
-7. 用語に関連する事例
-
-Web検索とコンテンツ取得と画像取得ツールを使用して、これらの情報を収集してください。
-数値データからグラフ画像を作成することもできるので、生の数値データが取れそうななども確認してください。
-数値データが取得できた場合は、グラフ生成ツールで作成した画像を使用して視覚的に表現することも検討してください。
-必ず1つ以上の画像を取得するようにしてください。
-'''
-
-    def _create_qualification_prompt(
-        self, user_prompt: str, pre_research_prompt: str
-    ) -> List[Dict]:
+    def _create_qualification_prompt(self) -> List[Dict]:
         """資格確認プロンプトの作成"""
         # モードに応じた最大会話ターン数を設定
-        max_turns = SUMMARY_CONVERSATION_TURNS if self.mode == "summary" else MAX_CONVERSATION_TURNS
-        
+        max_turns = (
+            SUMMARY_CONVERSATION_TURNS
+            if self.mode == "summary"
+            else MAX_CONVERSATION_TURNS
+        )
+
         return [
             {
                 'text': f'''あなたは優秀なリサーチャーです。
-会話相手はあなたと同じ {user_prompt} という調査依頼を受けとった同僚の AI さんです。
-
-事前の調査内容として {pre_research_prompt} が与えられています。
+会話相手はあなたと同じ調査内容で依頼を受けている同僚の AI さんです。
+最初に <topic> タグで調査のトピックを、<pre-research> タグで事前の調査内容が与えらます。
 調査内容はキーワードや意味の列挙なので、調査の粒度や観点などは仮説を持って調査をした後調査結果を作成し、調査結果のフィードバックをもらうことでしか改善できません。
 AI さんはあなたの思考の枠を外して広い視野を提供してくれます。
 あなたも調査内容を自由に広げて網羅性を高め、その後どんなことを調べるのかを深めていってください。
-特に反対意見は大事です。お互いの網羅性や深さの不足を指摘しながらAI さんとの会話を重ね、リサーチする内容を決めていってください。
+特に反対意見や出ていない意見は大事です。既出の意見はそんなに重要ではありません。
+お互いの網羅性や深さの不足を指摘しながらAI さんとの会話を重ね、リサーチする内容を決めていってください。
 会話はお互い {max_turns} 回までしかできないので、それまでに議論をまとめてください。
-ただし会話は以下の内容をまとめてください。
-
+ただし会話は <rules> を遵守してください。
+<rules>
 * 具体的にどんなことをするのか actionable にまとめる必要があります。
 * 予算や人員については触れてはいけません。調査する内容にだけフォーカスしてください。
-* 調査対象に関わるだろう人の観点を複数入れてください。例えば料理であれば、調理器具をつくる人、食材を運ぶ人、料理を作る人、料理を運ぶ人、食べる人、口コミを書く人などです。与えられたお題に反しない限り様々な人に思いを巡らせてください。
+* 調査対象に関わるだろう人の観点を複数入れてください。例えば料理であれば、調理器具をつくる人、食材を売る人、食材を買う人、食材を運ぶ人、料理を作る人、料理を運ぶ人、食べる人、口コミを書く人、ゴミを捨てる人、などです。与えられたお題に反しない限り様々な人に思いを巡らせてください。
 * 会話を始める前に、自分がどのように考えたのか、を述べてから結論を述べてください。
 * さまざまな観点から内容をブラッシュアップしてください。
 * 事前調査に基づき、画像取得や作成したグラフ画像などの視覚的な情報をできるだけ活用することを検討してください。
-* 説明をよりわかりやすく整理するためにmermaid形式を必要に応じて利用し、sequence / class / er diagram / mindmap / pie / gantt / quadrant / gitgraph / timeline / sanky-beta / architecture-betaなどを議論上の整理に用いてください。
-
+* 説明をよりわかりやすく整理するために mermaid 形式を必要に応じて利用し、sequence / class / er diagram / mindmap / pie / gantt / quadrant / gitgraph / timeline / sankey-beta / architecture-beta などを議論上の整理に用いてください。
+</rules>
 また、発言する際は最初に必ず x 回目の発言です、と言ってください。発言回数は自分の発言回数であり、相手の発言はカウントしてはいけません。
 '''
             }
