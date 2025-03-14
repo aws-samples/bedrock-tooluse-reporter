@@ -1,27 +1,3 @@
-# deep-research-modoki
-
-## 前提
-* リージョンは `us-west-2`
-* aws configure してあること
-* Bedrock Invoke できること
-* claude-3.7-sonnet-v1, claude-3.5-sonnet-v2 が使えること
-
-## Getting started
-
-1. `.brave` ファイルをリポジトリのルートディレクトリに配置し、そこに brave サーチの API キーを保存する。  
-  API キーの取得は[こちら](https://brave.com/search/api/)から
-2. `pip install -r requirements.txt` を実行
-3. `playwright install chromium` を実行
-4. python main.py --prompt "きのこの山とたけのこの里、どちらが至高のお菓子かの結論"  
-  (prompt は自由に変える)
-5. `./reports/` ディレクトリに `report_YYYYMMDD_HH24MISS.md` および `html` 形式でレポートが出来上がります。
-6. enjoy!
-
-## config file
-
-`--config` オプションを利用するとyamlで設定ファイルを読み込んで動作します。
-
-```
 # config.yaml - Deep Research Modoki Configuration
 
 # Bedrock モデルの設定
@@ -60,7 +36,7 @@ research:
 
 # LLM接続設定
 #    profilesには複数のプロファイルを設定できます
-#    Throttling が厳しいときは複数アカウント払い出して各アカウントに振り分ける事で回答を得る事ができます
+#    Throttling が厳しいときは複数アカウント払い出して各アカウントに振り分ける事で回答を得ることができます
 #    必ず各Profileの該当RegionでBedrockモデルを利用許諾して設定してからご利用ください
 #    例）profiles:
 #         - "default"
@@ -73,16 +49,4 @@ connection:
   max_delay: 300
   profiles:
     - "default"
-```
-
-
-## 開発時
-pip-compile を使っているので、requirements.txt を変更したい場合は以下のようにしてください。
-
-
-```shell
-# 事前に requirements.in に変更したいパッケージを記載したあとに
-pip-compile requirements.in
-# インストール
-pip install -r requirements.txt
-```
+  

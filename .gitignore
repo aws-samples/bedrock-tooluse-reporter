@@ -6,4 +6,5 @@ reports/*
 /trush/*
 /test.log/*
 /python/*
-
+/venv/*
+config.yaml

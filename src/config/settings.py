@@ -1,25 +1,27 @@
 """
-設定ファイル
-環境変数とデフォルト値の管理
-
-このモジュールは、アプリケーション全体で使用される設定値を定義します。
+Configuration settings for Deep Research Modoki
 """
 
+import os
+import yaml
 from typing import Dict, Any
 
+# デフォルト設定値
 # Bedrock モデルの設定
 # モデル名とそのAWS Bedrock IDのマッピング
 MODEL_CONFIG: Dict[str, str] = {
     "claude-3.5-sonnet": "us.anthropic.claude-3-5-sonnet-20241022-v2:0",
     "claude-3.7-sonnet": "us.anthropic.claude-3-7-sonnet-20250219-v1:0",
+    "claude-3.5-haiku": "us.anthropic.claude-3-haiku-20240307-v1:0",
     "nova-pro": "us.amazon.nova-pro-v1:0",
+    "deepseek.r1":"deepseek.r1-v1:0",
     "mistral-large": "mistral.mistral-large-2407-v1:0",
     "llama-3.3": "us.meta.llama3-3-70b-instruct-v1:0",
 }
 
 # 使用するモデルの設定
 PRIMARY_MODEL = "claude-3.7-sonnet"  # 主要な対話に使用するモデル
-SECONDARY_MODEL = "claude-3.5-sonnet"  # 二次的な対話に使用するモデル
+SECONDARY_MODEL = "deepseek.r1"  # 二次的な対話に使用するモデル
 
 # 会話の最大ターン数
 MAX_CONVERSATION_TURNS = 5
@@ -38,7 +40,11 @@ LLM_CONNECTION = {
     "max_retries": 8,  # 最大リトライ回数
     "base_delay": 20,  # 初期バックオフ遅延（秒）
     "max_delay": 300,  # 最大バックオフ遅延（秒）
+    "profiles": [  # 使用するAWSプロファイル名のリスト
+        "default"
+    ]
 }
+
 
 # ツール設定
 TOOL_CONFIG = {
@@ -272,3 +278,106 @@ GRAPH_CONFIG = {
         "#17becf",
     ],
 }
+
+class Config:
+    # 設定ファイルからの読み込み関数
+    def load_config(config_path: str = None) -> None:
+        """
+        設定ファイルから設定を読み込み、グローバル変数を更新する
+
+        Args:
+            config_path: 設定ファイルのパス。Noneの場合はデフォルト値を使用
+        """
+        global MODEL_CONFIG, PRIMARY_MODEL, SECONDARY_MODEL
+        global MAX_CONVERSATION_TURNS, SUMMARY_CONVERSATION_TURNS
+        global MAX_PRE_RESEARCH_SEARCHES, SUMMARY_PRE_RESEARCH_SEARCHES
+        global MAX_RESEARCH_SEARCHES, SUMMARY_RESEARCH_SEARCHES
+        global LLM_CONNECTION
+        
+        if not config_path or not os.path.exists(config_path):
+            if config_path:
+                print(f"警告: 設定ファイル {config_path} が見つかりません。デフォルト値を使用します。")
+            return
+        
+        try:
+            with open(config_path, 'r', encoding='utf-8') as file:
+                config = yaml.safe_load(file)
+            
+            if not config:
+                print("警告: 設定ファイルが空か無効です。デフォルト値を使用します。")
+                return
+                
+            # モデル設定の更新
+            if 'models' in config:
+                MODEL_CONFIG.update(config['models'])
+            
+            # 主要モデル設定の更新
+            if 'primary_model' in config:
+                PRIMARY_MODEL = config['primary_model']
+            
+            # 二次モデル設定の更新
+            if 'secondary_model' in config:
+                SECONDARY_MODEL = config['secondary_model']
+            
+            # 会話設定の更新
+            if 'conversation' in config:
+                conv_config = config['conversation']
+                if 'max_turns' in conv_config:
+                    MAX_CONVERSATION_TURNS = conv_config['max_turns']
+                if 'summary_turns' in conv_config:
+                    SUMMARY_CONVERSATION_TURNS = conv_config['summary_turns']
+            
+            # 調査設定の更新
+            if 'research' in config:
+                research_config = config['research']
+                if 'max_pre_searches' in research_config:
+                    MAX_PRE_RESEARCH_SEARCHES = research_config['max_pre_searches']
+                if 'summary_pre_searches' in research_config:
+                    SUMMARY_PRE_RESEARCH_SEARCHES = research_config['summary_pre_searches']
+                if 'max_searches' in research_config:
+                    MAX_RESEARCH_SEARCHES = research_config['max_searches']
+                if 'summary_searches' in research_config:
+                    SUMMARY_RESEARCH_SEARCHES = research_config['summary_searches']
+            
+            # LLM接続設定の更新
+            if 'connection' in config:
+                conn_config = config['connection']
+                for key, value in conn_config.items():
+                    if key in LLM_CONNECTION:
+                        LLM_CONNECTION[key] = value
+            
+            print("設定ファイルから設定を読み込みました。")
+            
+        except Exception as e:
+            print(f"設定ファイルの読み込み中にエラーが発生しました: {str(e)}")
+            print("デフォルト設定を使用します。")
+
+    # 現在の設定を表示する関数
+    def display_config() -> None:
+        """現在の設定値を表示する"""
+        print("\n=== Deep Research Modoki 設定 ===")
+        
+        print("\n--- モデル設定 ---")
+        for model_name, model_id in MODEL_CONFIG.items():
+            print(f"  {model_name}: {model_id}")
+        
+        print(f"\n主要モデル: {PRIMARY_MODEL}")
+        print(f"二次モデル: {SECONDARY_MODEL}")
+        
+        print("\n--- 会話設定 ---")
+        print(f"  最大ターン数: {MAX_CONVERSATION_TURNS}")
+        print(f"  サマリーモードのターン数: {SUMMARY_CONVERSATION_TURNS}")
+        
+        print("\n--- 調査設定 ---")
+        print(f"  標準モードの事前調査検索回数: {MAX_PRE_RESEARCH_SEARCHES}")
+        print(f"  サマリーモードの事前調査検索回数: {SUMMARY_PRE_RESEARCH_SEARCHES}")
+        print(f"  標準モードの調査検索回数: {MAX_RESEARCH_SEARCHES}")
+        print(f"  サマリーモードの調査検索回数: {SUMMARY_RESEARCH_SEARCHES}")
+        
+        print("\n--- 接続設定 ---")
+        print(f"  タイムアウト: {LLM_CONNECTION['timeout']} 秒")
+        print(f"  最大リトライ回数: {LLM_CONNECTION['max_retries']}")
+        print(f"  初期遅延: {LLM_CONNECTION['base_delay']} 秒")
+        print(f"  最大遅延: {LLM_CONNECTION['max_delay']} 秒")
+        print(f"  プロファイル: {', '.join(LLM_CONNECTION['profiles'])}")
+        print("\n=======================================")

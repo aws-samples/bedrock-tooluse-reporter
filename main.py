@@ -15,7 +15,7 @@ from src.core.research_manager import ResearchManager
 from src.utils.exceptions import ResearchError
 import os
 from datetime import datetime
-
+from src.config.settings import Config
 
 def main():
     """
@@ -23,9 +23,10 @@ def main():
 
     This function:
     1. Parses command-line arguments to get the research prompt and mode
-    2. Initializes the logging system
-    3. Creates and executes a research manager instance
-    4. Handles any errors that occur during the research process
+    2. Loads configuration from file
+    3. Initializes the logging system
+    4. Creates and executes a research manager instance
+    5. Handles any errors that occur during the research process
 
     Returns:
         int: 0 for successful execution, 1 for errors
@@ -38,7 +39,19 @@ def main():
         default="standard",
         help="Research mode: standard (default) or summary",
     )
+    parser.add_argument(
+        "--config",
+        default=None,
+        help="Path to configuration file (optional)",
+    )
     args = parser.parse_args()
+
+    # 設定ファイルがある場合は読み込む
+    if args.config:
+        Config.load_config(args.config)
+    
+    # 現在の設定を表示
+    Config.display_config()
 
     # Initialize logger
     logger = DualLogger()
