@@ -1,88 +1,133 @@
-# deep-research-modoki
+# Deep Research Modoki
 
-## 前提
-* リージョンは `us-west-2`
-* aws configure してあること
-* Bedrock Invoke できること
-* claude-3.7-sonnet-v1, claude-3.5-sonnet-v2 が使えること
+AIを活用した自動レポート生成システム
 
-## Getting started
+## 概要
 
-1. `.brave` ファイルをリポジトリのルートディレクトリに配置し、そこに brave サーチの API キーを保存する。  
-  API キーの取得は[こちら](https://brave.com/search/api/)から
-2. `pip install -r requirements.txt` を実行
-3. `playwright install chromium` を実行
-4. python main.py --prompt "きのこの山とたけのこの里、どちらが至高のお菓子かの結論"  
-  (prompt は自由に変える)
-5. `./reports/` ディレクトリに `report_YYYYMMDD_HH24MISS.md` および `html` 形式でレポートが出来上がります。
-6. enjoy!
+Deep Research Modokiは、与えられたトピックに関する詳細なレポートを自動的に生成するAIシステムです。複数のAIモデルを活用して、情報収集、視点の多角化、データ調査、レポート執筆を行います。
 
-## config file
+## 特徴
 
-`--config` オプションを利用するとyamlで設定ファイルを読み込んで動作します。
+- **コンテキスト理解**: ユーザーの意図を理解し、トピックに関連する基本情報を収集
+- **多角的視点**: 2つの異なるAIモデル間の対話を通じて多様な視点を獲得
+- **データ収集**: Web検索、コンテンツ取得、画像検索などを活用した情報収集
+- **レポート生成**: 収集した情報に基づく構造化されたマークダウンレポートの作成
+- **視覚化**: Mermaid図やWeb画像を活用した視覚的なレポート
+- **複数形式**: マークダウン、HTML、PDFの3形式でレポートを出力
 
-```
-# config.yaml - Deep Research Modoki Configuration
+## システム構成
 
-# Bedrock モデルの設定
-#    モデルIDを追加してストアしておきエイリアス名を設定します
-models:
-  claude-3.5-sonnet: "us.anthropic.claude-3-5-sonnet-20241022-v2:0"
-  claude-3.7-sonnet: "us.anthropic.claude-3-7-sonnet-20250219-v1:0"
-  nova-pro: "us.amazon.nova-pro-v1:0"
-  deepseek.r1": "deepseek.r1-v1:0"
-  mistral-large: "mistral.mistral-large-2407-v1:0"
-  llama-3.3: "us.meta.llama3-3-70b-instruct-v1:0"
+システムは以下の4つの主要コンポーネントで構成されています：
 
-# 使用するモデルの設定
-#   上記エイリアスを指定します
-#   primary_modelはconversion apiでPPTを受け取れるモデルである必要があります
-primary_model: "claude-3.7-sonnet"
-secondary_model: "nova-pro"
+1. **ContextChecker**: ユーザーの意図を理解し、トピックに関連する基本情報を収集
+2. **PerspectiveExplorer**: 2つの異なるAIモデル間の対話を通じて多角的な視点を獲得
+3. **DataSurveyor**: レポートフレームワークに基づいて必要なデータを収集
+4. **ReportWriter**: 収集したデータとフレームワークに基づいてレポートを執筆
 
-# 会話の最大ターン数
-#   max_turns: 標準モードのLLM同士の議論回数
-#   summary_turns: サマリーモードのLLM同士の議論回数
-conversation:
-  max_turns: 5
-  summary_turns: 3
+### 前提条件
+- AWS環境
+  - リージョン: `us-west-2`
+  - AWS CLIで設定済み（`aws configure`）
+  - Bedrock APIの呼び出し権限
+  - 対応モデル: claude-3.7-sonnet-v1, claude-3.5-sonnet-v2
+- Python 3.10
+- Brave Search API キー
 
-# 調査の最大回数
-#   max_pre_searches: 事前調査の最大回数
-#   summary_pre_searches: サマリーモードの事前調査の最大回数
-#   max_searched: 議論後の調査の調査最大回数
-#   summary_searches: サマリーモード時の議論後の調査最大回数
-research:
-  max_pre_searches: 40
-  summary_pre_searches: 3
-  max_searches: 40
-  summary_searches: 10
+## インストール方法
 
-# LLM接続設定
-#    profilesには複数のプロファイルを設定できます
-#    Throttling が厳しいときは複数アカウント払い出して各アカウントに振り分ける事で回答を得る事ができます
-#    必ず各Profileの該当RegionでBedrockモデルを利用許諾して設定してからご利用ください
-#    例）profiles:
-#         - "default"
-#         - "profile_two"
-#         - "profiel_three"
-connection:
-  timeout: 1200
-  max_retries: 8
-  base_delay: 20
-  max_delay: 300
-  profiles:
-    - "default"
+1. リポジトリをクローン
+   ```shell
+   git clone git@ssh.gitlab.aws.dev:gokazu/deep-research-modoki.git
+   cd deep-research-modoki
+2. `.brave` ファイルをリポジトリのルートディレクトリに作成し、Brave Search APIキーを保存
+3. 仮想環境を作成し、依存パッケージをインストール
+    ```shell
+    python -m venv .venv
+    source .venv/bin/activate  # Windowsの場合: .venv\Scripts\activate
+    pip install -r requirements.txt
+    ```
+## 使用方法
+
+```bash
+# 基本的な使用方法
+python main.py --prompt "調査したいトピック"
 ```
 
+例: 
+```shell
+python main.py --prompt "タワマン文学とマウンティングについてのレポート"
+```
 
-## 開発時
-pip-compile を使っているので、requirements.txt を変更したい場合は以下のようにしてください。
+### オプション
+`--prompt`, `-p`: 調査するトピック（必須）
+`--mode`, `-m`: 処理モード（short/long）を指定。shortは処理回数を減らして高速に、longは詳細な調査を行います
+`--log-level`, `-l`: ログレベルを指定（DEBUG/INFO/WARNING/ERROR/CRITICAL）
+`--resume-file`, `-r`: 以前の会話履歴から再開する場合に指定
+例: 
+```shell
+python main.py --prompt "AIと著作権の未来" --mode long --log-level DEBUG
+```
 
+### 出力
+- レポートは `./report/[タイムスタンプ]/` に生成されます
+- 各レポートディレクトリには以下のファイルが含まれます:
+    - `report.md`: マークダウン形式のレポート
+    - `report.html`: スタイル適用済みのHTML形式レポート
+    - `report.pdf`: 印刷可能なPDF形式レポート
+    - `images/`: レポートで使用される画像ファイル
+
+## 開発者向け情報
+### 依存パッケージの管理
+このプロジェクトでは pip-compile を使用して依存関係を管理しています。
 
 ```shell
-# 事前に requirements.in に変更したいパッケージを記載したあとに
+# requirements.in を編集後、requirements.txt を更新
 pip-compile requirements.in
-# インストール
+
+# 依存パッケージのインストール
 pip install -r requirements.txt
 ```
+
+### プロジェクト構造
+```text
+deep-research-modoki/
+├── main.py                # メインエントリーポイント
+├── requirements.txt       # 依存パッケージ
+├── research/              # 研究関連モジュール
+│   ├── __init__.py
+│   ├── perspective_explorer.py
+│   ├── reporter.py
+│   └── mermaid.md
+├── utils/                 # ユーティリティモジュール
+│   ├── __init__.py
+│   ├── bedrock.py
+│   ├── bedrock_wrapper.py
+│   ├── config.py
+│   ├── conversation.py
+│   ├── logger.py
+│   ├── tools.py
+│   └── utils.py
+├── report/                # 生成されたレポート
+├── conversation/          # 会話履歴
+└── log/                   # ログファイル
+```
+
+## 設定
+
+設定は `utils/config.py` で管理されています。主な設定項目：
+
+- AIモデルID
+- 各プロセスの最大実行回数
+- ディレクトリパス
+- 使用するツール
+- 画像関連の設定
+- ドキュメント関連の設定
+
+### トラブルシューティング
+- **APIキーエラー**: `.brave` ファイルが正しく配置されているか確認
+- **AWS認証エラー**: `aws configure` で認証情報が正しく設定されているか確認
+- **モデルアクセスエラー**: 指定されたBedrockモデルへのアクセス権があるか確認
+- **メモリエラー**: 大量の画像や長いテキストを処理する場合、十分なメモリを確保
+
+## 裏メニュー
+アカウントラウンドロビンする場合は `utils/bedrock_rapper.py` の `self.profiles` をいじる

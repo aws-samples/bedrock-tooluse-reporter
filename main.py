@@ -1,95 +1,102 @@
-"""
-Deep Research Modoki - AI-powered Research Assistant
+from utils import DualLogger, parse_arguments, Conversation
+from research import ContextChecker, PerspectiveExplorer, DataSurveyor, ReportWriter
+import traceback
+from utils import Config, md2html, html2pdf
 
-This module serves as the main entry point for the research assistant application.
-It initializes the research process, handles command-line arguments, and manages
-the overall execution flow of the research task.
-
-The application takes a research prompt from the user and generates comprehensive
-research reports by leveraging AI models and web-based data collection.
-"""
-
-import argparse
-from logger import DualLogger
-from src.core.research_manager import ResearchManager
-from src.utils.exceptions import ResearchError
-import os
-from datetime import datetime
-from src.config.settings import Config
 
 def main():
     """
-    Main execution function for the research assistant.
-
-    This function:
-    1. Parses command-line arguments to get the research prompt and mode
-    2. Loads configuration from file
-    3. Initializes the logging system
-    4. Creates and executes a research manager instance
-    5. Handles any errors that occur during the research process
-
-    Returns:
-        int: 0 for successful execution, 1 for errors
-    """
-    parser = argparse.ArgumentParser(description="AI Research Assistant")
-    parser.add_argument("--prompt", required=True, help="Research prompt/question")
-    parser.add_argument(
-        "--mode",
-        choices=["standard", "summary"],
-        default="standard",
-        help="Research mode: standard (default) or summary",
-    )
-    parser.add_argument(
-        "--config",
-        default=None,
-        help="Path to configuration file (optional)",
-    )
-    args = parser.parse_args()
-
-    # 設定ファイルがある場合は読み込む
-    if args.config:
-        Config.load_config(args.config)
+    メイン関数 - レポート生成プロセスを制御します
     
-    # 現在の設定を表示
-    Config.display_config()
-
-    # Initialize logger
-    logger = DualLogger()
-
+    コマンドライン引数を解析し、レポート生成の各ステップを順番に実行します。
+    1. コンテキストチェック: ユーザープロンプトの理解と初期情報収集
+    2. 視点探索: 複数の視点からトピックを検討
+    3. データ調査: レポートに必要なデータの収集
+    4. レポート作成: 収集した情報に基づくレポートの執筆
+    """
+    # コマンドライン引数を解析
+    args = parse_arguments()
+    conversation = Conversation(args.resume_file)
+    timestamp_str = conversation.timestamp_str
+    logger = DualLogger(timestamp_str=timestamp_str, log_level=args.log_level)
+    logger.info(f"会話履歴ファイルは {conversation.conversation_file} です。")
+    config = Config(args.mode)
+    logger.debug(args)
     try:
-        # 出力ディレクトリの作成
-        output_dir = "reports"
-        os.makedirs(output_dir, exist_ok=True)
-
-        # ファイル名の生成
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        base_filename = os.path.join(output_dir, f"report_{timestamp}")
-
-        # 画像ディレクトリの作成
-        image_dir = f"{base_filename}_images"
-        os.makedirs(image_dir, exist_ok=True)
-        logger.log(f"画像ディレクトリを作成しました: {image_dir}")
-
-        # Initialize and execute research manager
-        research_manager = ResearchManager(logger, base_filename)
-        html_path, md_path, pdf_path = research_manager.execute_research(
-            args.prompt, args.mode
+        # ステップ1: コンテキストチェック - トピックの理解と初期情報収集
+        context_checker = ContextChecker(
+            timestamp_str=timestamp_str,
+            logger=logger,
+            conversation=conversation,
+            user_prompt=args.prompt,
+            requested_tools=config.CONTEXT_CHECK_REQUESTED_TOOLS,
+            mode=args.mode,
+            max_iterate_count=config.MAX_CONTEXT_CHECK_COUNT,
         )
+        context_checker_result = context_checker.run()
 
-        logger.log(f"研究が完了しました。(モード: {args.mode})")
-        logger.log(f"HTMLレポート: {html_path}")
-        logger.log(f"Markdownレポート: {md_path}")
-        logger.log(f"PDFレポート: {pdf_path}")
+        # ステップ2: 視点探索 - 複数の視点からトピックを検討
+        perspective_explorer_prompt = f"""
+<topic>
+{args.prompt}
+</topic>
+<pre-research>
+{context_checker_result}
+</pre-research>"""
+        perspective_explorer = PerspectiveExplorer(
+            timestamp_str=timestamp_str,
+            logger=logger,
+            conversation=conversation,
+            user_prompt=perspective_explorer_prompt,
+            mode=args.mode,
+        )
+        report_framework = perspective_explorer.run()
 
-    except ResearchError as e:
-        logger.log(f"エラーが発生しました: {str(e)}")
-        return 1
+        # ステップ3: データ調査 - レポートに必要なデータの収集
+        data_surveyor_prompt = (
+            f"<title>{args.prompt}</title><framework>{report_framework}</framework>"
+        )
+        data_surveyor = DataSurveyor(
+            timestamp_str=timestamp_str,
+            logger=logger,
+            conversation=conversation,
+            user_prompt=data_surveyor_prompt,
+            requested_tools=config.DATA_SURVEYOR_REQUESTED_TOOLS,
+            mode=args.mode,
+            max_iterate_count=config.MAX_DATA_SURVEYOR_COUNT,
+        )
+        survey = data_surveyor.run()
+
+        # ステップ4: レポート作成 - 収集した情報に基づくレポートの執筆
+        report_writer_prompt = f"""<title>{args.prompt}</title>
+<framework>{report_framework}</framework>
+<survey>{survey['survey_result']}</<survey>
+<report>{survey['report_path']}</report>"""
+        report_generator = ReportWriter(
+            timestamp_str=timestamp_str,
+            logger=logger,
+            conversation=conversation,
+            user_prompt=report_writer_prompt,
+            requested_tools=config.REPORT_WRITER_REQUESTED_TOOLS,
+            mode=args.mode,
+            max_iterate_count=99,
+        )
+        report_markdown_path = report_generator.run()
+
+        # マークダウンからHTMLへ変換
+        report_html_path = md2html(report_markdown_path, logger)
+        # HTMLからPDFへ変換
+        logger.info(html2pdf(report_html_path, logger))
+
     except Exception as e:
-        logger.log(f"予期せぬエラーが発生しました: {str(e)}")
+        error_trace = traceback.format_exc()
+        logger.error(error_trace)
+        print(f"予期しないエラーが発生しました: {e}")
         return 1
 
     return 0
 
 
 if __name__ == "__main__":
-    exit(main())
+    exit_code = main()
+    exit(exit_code)
