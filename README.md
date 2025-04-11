@@ -128,6 +128,3 @@ bedrock-tooluse-reporter/
 - **AWS認証エラー**: `aws configure` で認証情報が正しく設定されているか確認
 - **モデルアクセスエラー**: 指定されたBedrockモデルへのアクセス権があるか確認
 - **メモリエラー**: 大量の画像や長いテキストを処理する場合、十分なメモリを確保
-
-## 裏メニュー
-アカウントラウンドロビンする場合は `utils/bedrock_rapper.py` の `self.profiles` をいじる
