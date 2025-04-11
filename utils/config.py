@@ -52,6 +52,11 @@ class Config:
                     "TEMPERATURE": 1.0,
                     "TOP_P": 0.9,
                 },
+                "CACHE_SUPPORTED_MODELS": [
+                    "us.anthropic.claude-3-7-sonnet-20250219-v1:0",
+                    "anthropic.claude-3-7-sonnet-20250219-v1:0",
+                ],
+                "MAX_CACHE_BLOCKS": 4,
             }
         )
         self.PRIMARY_MODEL_ID: str = "us.anthropic.claude-3-7-sonnet-20250219-v1:0"
