@@ -1,4 +1,4 @@
-# Deep Research Modoki - Class Diagram
+# Bedrock Tooluse Reporter - Class Diagram
 
 ## Main Components
 
