@@ -41,6 +41,8 @@ class BedrockModel:
         self.max_retries = self.config.BEDROCK.MAX_RETRIES
         self.base_delay = self.config.BEDROCK.BASE_DELAY
         self.max_delay = self.config.BEDROCK.MAX_DELAY
+        self.cache_supported_models = self.config.BEDROCK.CACHE_SUPPORTED_MODELS
+        self.max_cache_blocks = self.config.BEDROCK.MAX_CACHE_BLOCKS
         self.logger = logger
 
     def _exponential_backoff(self, retry_count: int) -> float:
@@ -127,6 +129,30 @@ class BedrockModel:
         Returns:
             Dict: モデルからのレスポンス
         """
+
+        if model_id in self.cache_supported_models:
+            system_prompt.append({"cachePoint": {"type": "default"}})
+            for i, message in enumerate(messages):
+                if i >= (
+                    self.max_cache_blocks - 1
+                ):  # キャッシュブロックは(system + messages (+tools))で上限が決まるため、system 分の 1 を減算
+                    break
+                elif 'content' in message and isinstance(message['content'], list):
+                    message['content'].append({"cachePoint": {"type": "default"}})
+        else:
+            system_prompt = [
+                item
+                for item in system_prompt
+                if not (isinstance(item, dict) and "cachePoint" in item)
+            ]
+            for message in messages:
+                if 'content' in message and isinstance(message['content'], list):
+                    message['content'] = [
+                        item
+                        for item in message['content']
+                        if not (isinstance(item, dict) and 'cachePoint' in item)
+                    ]
+
         # APIリクエストのパラメータを構築
         kwargs = {
             "modelId": model_id,

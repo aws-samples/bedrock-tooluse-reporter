@@ -1,4 +1,4 @@
-boto3>=1.37.9
+boto3>=1.37.32
 black>=24.8.0
 pip-tools>=7.4.1
 requests>=2.31.0

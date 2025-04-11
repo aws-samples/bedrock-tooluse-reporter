@@ -37,6 +37,8 @@ class BedrockModel(BaseBedrockModel):
         self.max_retries = base_model.max_retries
         self.base_delay = base_model.base_delay
         self.max_delay = base_model.max_delay
+        self.cache_supported_models = base_model.cache_supported_models
+        self.max_cache_blocks = base_model.max_cache_blocks
         self.logger = logger
 
         # 利用可能なプロファイル名のリスト
