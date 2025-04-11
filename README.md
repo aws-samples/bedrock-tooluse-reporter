@@ -1,10 +1,10 @@
-# Deep Research Modoki
+# Bedrock Tooluse Reporter
 
 AIを活用した自動レポート生成システム
 
 ## 概要
 
-Deep Research Modokiは、与えられたトピックに関する詳細なレポートを自動的に生成するAIシステムです。複数のAIモデルを活用して、情報収集、視点の多角化、データ調査、レポート執筆を行います。
+Bedrock Tooluse Reporterは、与えられたトピックに関する詳細なレポートを自動的に生成するAIシステムです。複数のAIモデルを活用して、情報収集、視点の多角化、データ調査、レポート執筆を行います。
 
 ## 特徴
 
@@ -37,8 +37,8 @@ Deep Research Modokiは、与えられたトピックに関する詳細なレポ
 
 1. リポジトリをクローン
    ```shell
-   git clone git@ssh.gitlab.aws.dev:gokazu/deep-research-modoki.git
-   cd deep-research-modoki
+   git clone https://github.com/aws-samples/bedrock-tooluse-reporter
+   cd bedrock-tooluse-reporter
 2. `.brave` ファイルをリポジトリのルートディレクトリに作成し、Brave Search APIキーを保存
 3. 仮想環境を作成し、依存パッケージをインストール
     ```shell
@@ -90,7 +90,7 @@ pip install -r requirements.txt
 
 ### プロジェクト構造
 ```text
-deep-research-modoki/
+bedrock-tooluse-reporter/
 ├── main.py                # メインエントリーポイント
 ├── requirements.txt       # 依存パッケージ
 ├── research/              # 研究関連モジュール
