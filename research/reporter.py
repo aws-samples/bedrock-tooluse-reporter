@@ -68,7 +68,7 @@ class BaseReporter:
             previous_report_dir = os.path.join(
                 self.config.REPORT_DIR, previous_timestamp_str
             )
-            print(previous_report_dir)
+            self.logger.info(previous_report_dir)
 
         report_dir = os.path.join(self.config.REPORT_DIR, self.timestamp_str)
 
@@ -367,7 +367,8 @@ class ContextChecker(BaseReporter):
                                 temp_dict[tool_use_id]["result"] = content_item[
                                     "toolResult"
                                 ]["content"]
-                                print(temp_dict[tool_use_id]["result"])
+                                self.logger.info(
+                                    temp_dict[tool_use_id]["result"])
                                 # 完成したエントリを配列に追加
                                 organized_data.append(temp_dict[tool_use_id])
 
@@ -519,7 +520,8 @@ class DataSurveyor(BaseReporter):
                                 temp_dict[tool_use_id]["result"] = content_item[
                                     "toolResult"
                                 ]["content"]
-                                print(temp_dict[tool_use_id]["result"])
+                                self.logger.info(
+                                    temp_dict[tool_use_id]["result"])
                                 # 完成したエントリを配列に追加
                                 organized_data.append(temp_dict[tool_use_id])
 
