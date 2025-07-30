@@ -50,12 +50,12 @@ Bedrock Tooluse Reporterは、与えられたトピックに関する詳細な�
 
 ```bash
 # 基本的な使用方法
-python main.py --prompt "調査したいトピック"
+uv run main.py --prompt "調査したいトピック"
 ```
 
 例: 
 ```shell
-python main.py --prompt "タワマン文学とマウンティングについてのレポート"
+uv run main.py --prompt "タワマン文学とマウンティングについてのレポート"
 ```
 
 ### オプション
@@ -65,7 +65,7 @@ python main.py --prompt "タワマン文学とマウンティングについて�
 `--resume-file`, `-r`: 以前の会話履歴から再開する場合に指定
 例: 
 ```shell
-python main.py --prompt "AIと著作権の未来" --mode long --log-level DEBUG
+uv run main.py --prompt "AIと著作権の未来" --mode long --log-level DEBUG
 ```
 
 ### 出力
@@ -77,16 +77,6 @@ python main.py --prompt "AIと著作権の未来" --mode long --log-level DEBUG
     - `images/`: レポートで使用される画像ファイル
 
 ## 開発者向け情報
-### 依存パッケージの管理
-このプロジェクトでは pip-compile を使用して依存関係を管理しています。
-
-```shell
-# requirements.in を編集後、requirements.txt を更新
-pip-compile requirements.in
-
-# 依存パッケージのインストール
-pip install -r requirements.txt
-```
 
 ### プロジェクト構造
 ```text

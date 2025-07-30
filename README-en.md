@@ -52,12 +52,12 @@ The system consists of four main components:
 
 ```bash
 # Basic usage
-python main.py --prompt "Topic to research"
+uv run main.py --prompt "Topic to research"
 ```
 
 Example:  
 ```shell
-python main.py --prompt "Report on luxury condo literature and social status signaling"
+uv run main.py --prompt "Report on luxury condo literature and social status signaling"
 ```
 
 ### Options
@@ -68,7 +68,7 @@ python main.py --prompt "Report on luxury condo literature and social status sig
 
 Example:  
 ```shell
-python main.py --prompt "The future of AI and copyright" --mode long --log-level DEBUG
+uv run main.py --prompt "The future of AI and copyright" --mode long --log-level DEBUG
 ```
 
 ### Output
@@ -80,16 +80,6 @@ python main.py --prompt "The future of AI and copyright" --mode long --log-level
     - `images/`: Image files used in the report
 
 ## Developer Information
-### Dependency Management
-This project uses pip-compile to manage dependencies.  
-
-```shell
-# After editing requirements.in, update requirements.txt
-pip-compile requirements.in
-
-# Install dependencies
-pip install -r requirements.txt
-```
 
 ### Project Structure
 ```text
