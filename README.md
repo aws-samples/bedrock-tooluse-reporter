@@ -77,16 +77,6 @@ uv run main.py --prompt "AIと著作権の未来" --mode long --log-level DEBUG
     - `images/`: レポートで使用される画像ファイル
 
 ## 開発者向け情報
-### 依存パッケージの管理
-このプロジェクトでは pip-compile を使用して依存関係を管理しています。
-
-```shell
-# requirements.in を編集後、requirements.txt を更新
-pip-compile requirements.in
-
-# 依存パッケージのインストール
-pip install -r requirements.txt
-```
 
 ### プロジェクト構造
 ```text

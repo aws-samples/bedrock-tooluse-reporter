@@ -80,16 +80,6 @@ uv run main.py --prompt "The future of AI and copyright" --mode long --log-level
     - `images/`: Image files used in the report
 
 ## Developer Information
-### Dependency Management
-This project uses pip-compile to manage dependencies.  
-
-```shell
-# After editing requirements.in, update requirements.txt
-pip-compile requirements.in
-
-# Install dependencies
-pip install -r requirements.txt
-```
 
 ### Project Structure
 ```text
