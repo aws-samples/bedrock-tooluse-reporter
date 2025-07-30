@@ -1,9 +1,0 @@
-boto3>=1.37.32
-black>=24.8.0
-pip-tools>=7.4.1
-requests>=2.31.0
-beautifulsoup4>=4.13.3
-markdown>=0.9
-selenium>=4.30.0
-webdriver-manager>=4.0.2
-pyyaml

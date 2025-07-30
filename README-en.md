@@ -52,12 +52,12 @@ The system consists of four main components:
 
 ```bash
 # Basic usage
-python main.py --prompt "Topic to research"
+uv run main.py --prompt "Topic to research"
 ```
 
 Example:  
 ```shell
-python main.py --prompt "Report on luxury condo literature and social status signaling"
+uv run main.py --prompt "Report on luxury condo literature and social status signaling"
 ```
 
 ### Options
@@ -68,7 +68,7 @@ python main.py --prompt "Report on luxury condo literature and social status sig
 
 Example:  
 ```shell
-python main.py --prompt "The future of AI and copyright" --mode long --log-level DEBUG
+uv run main.py --prompt "The future of AI and copyright" --mode long --log-level DEBUG
 ```
 
 ### Output
