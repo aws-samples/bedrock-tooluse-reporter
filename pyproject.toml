@@ -15,7 +15,7 @@ dependencies = [
     "charset-normalizer==3.4.1",
     "click==8.1.8",
     "exceptiongroup==1.2.2",
-    "h11==0.14.0",
+    "h11==0.16.0",
     "idna==3.10",
     "jmespath==1.0.1",
     "markdown==3.7",
